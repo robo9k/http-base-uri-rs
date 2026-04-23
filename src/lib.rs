@@ -17,6 +17,10 @@
 //! # }
 //! ```
 // TODO: serde_core
+
+#![deny(unsafe_code)]
+#![cfg_attr(not(any(test)), no_std)]
+
 use core::str::FromStr;
 
 // TODO: pub fn as_str(&self)

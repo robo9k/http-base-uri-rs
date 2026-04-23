@@ -2,6 +2,17 @@
 name = "http-base-uri"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+
+[badges]
+maintenance = { status = "experimental" }
+
+[features]
+default = ["std"]
+std = [
+    # https://github.com/hyperium/http/issues/551
+    "http/std",
+]
 
 [dependencies]
-http = "1"
+http = { version = "1", default-features = false }
