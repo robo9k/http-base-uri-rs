@@ -3,6 +3,9 @@ name = "http-base-uri"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
+repository = "https://github.com/robo9k/http-base-uri-rs.git"
+categories = ["web-programming"]
+include = ["src/"]
 
 [badges]
 maintenance = { status = "experimental" }
