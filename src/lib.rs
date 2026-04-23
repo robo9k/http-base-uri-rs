@@ -354,9 +354,7 @@ impl TryFrom<http::uri::Parts> for HttpBaseUri {
             return Err(InvalidHttpUriError(()));
         };
 
-        let authority = if let Some(authority) = value.authority {
-            authority
-        } else {
+        let Some(authority) = value.authority else {
             return Err(InvalidHttpUriError(()));
         };
 
