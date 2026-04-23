@@ -4,15 +4,39 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! use http_base_uri::HttpBaseUri;
 //!
-//! // Look Ma'; scheme and authority and path, but no query nor fragment!
+//! // Look Ma'; scheme and authority and path, but no query!
 //! let base_uri = "https://api.example.com/rest/v2".parse::<HttpBaseUri>()?;
 //!
 //! assert_eq!(base_uri.scheme(), &http::uri::Scheme::HTTPS);
 //! assert_eq!(base_uri.authority(), "api.example.com");
 //! assert_eq!(base_uri.path(), "/rest/v2");
 //!
-//! // BaseURI is a subset of Uri
+//! // HttpBaseUri is a subset of Uri
 //! let uri: http::Uri = base_uri.into();
+//!
+//! // also works with http and without path
+//! let base_uri = "http://example.com".parse::<HttpBaseUri>()?;
+//!
+//! assert_eq!(base_uri.scheme(), "http");
+//! assert_eq!(base_uri.authority(), "example.com");
+//! assert_eq!(base_uri.path(), "/"); // this is a quirk of http::Uri
+//!
+//! // invalid; has query
+//! let not_a_base_uri = "https://api.example.com/rest/v2?param=value";
+//! assert!(not_a_base_uri.parse::<HttpBaseUri>().is_err());
+//!
+//! // invalid; missing scheme
+//! let not_a_base_uri_either = "api.example.com";
+//! assert!(not_a_base_uri_either.parse::<HttpBaseUri>().is_err());
+//!
+//! // invalid; wrong scheme - come on now, it's in the name!
+//! let seriously_not_a_base_uri = "ftp://api.example.com";
+//! assert!(seriously_not_a_base_uri.parse::<HttpBaseUri>().is_err());
+//!
+//! struct MyHttpApiClient {
+//!     // typesafe, correct by construction 😌
+//!     base_uri: HttpBaseUri,
+//! }
 //! # Ok(())
 //! # }
 //! ```
@@ -21,22 +45,39 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(any(test)), no_std)]
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 use core::str::FromStr;
 
-// TODO: pub fn as_str(&self)
-// TODO: impl Clone, Display, FromStr, Hash, PartialEq, TryFrom<&'a [u8]>, TryFrom<&'a str>
 /// [`http::uri::Scheme`] newtype that is either HTTP or HTTPS
-#[derive(Debug)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HttpScheme(http::uri::Scheme);
 
 impl HttpScheme {
     pub const HTTP: Self = Self(http::uri::Scheme::HTTP);
     pub const HTTPS: Self = Self(http::uri::Scheme::HTTPS);
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl core::fmt::Display for HttpScheme {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 impl AsRef<http::uri::Scheme> for HttpScheme {
     fn as_ref(&self) -> &http::uri::Scheme {
         &self.0
+    }
+}
+
+impl AsRef<str> for HttpScheme {
+    fn as_ref(&self) -> &str {
+        self.as_str()
     }
 }
 
@@ -52,9 +93,22 @@ impl PartialEq<http::uri::Scheme> for HttpScheme {
     }
 }
 
-// TODO: impl Error, Display
+impl PartialEq<str> for HttpScheme {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == *other
+    }
+}
+
 #[derive(Debug)]
 pub struct InvalidSchemeError(());
+
+impl core::fmt::Display for InvalidSchemeError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "invalid scheme")
+    }
+}
+
+impl core::error::Error for InvalidSchemeError {}
 
 impl TryFrom<http::uri::Scheme> for HttpScheme {
     type Error = InvalidSchemeError;
@@ -68,14 +122,54 @@ impl TryFrom<http::uri::Scheme> for HttpScheme {
     }
 }
 
+impl FromStr for HttpScheme {
+    type Err = InvalidSchemeError;
+
+    fn from_str(s: &str) -> Result<Self, InvalidSchemeError> {
+        let scheme = http::uri::Scheme::from_str(s).map_err(|_e| InvalidSchemeError(()))?;
+
+        scheme.try_into()
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for HttpScheme {
+    type Error = InvalidSchemeError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, InvalidSchemeError> {
+        let scheme = http::uri::Scheme::try_from(value).map_err(|_e| InvalidSchemeError(()))?;
+
+        scheme.try_into()
+    }
+}
+
+impl<'a> TryFrom<&'a str> for HttpScheme {
+    type Error = InvalidSchemeError;
+
+    fn try_from(value: &'a str) -> Result<Self, InvalidSchemeError> {
+        let scheme = http::uri::Scheme::try_from(value).map_err(|_e| InvalidSchemeError(()))?;
+
+        scheme.try_into()
+    }
+}
+
 // TODO: join PathAndQuery ?
 // TODO: pub const fn from_static(src: &'static str)
 // TODO: pub fn from_maybe_shared<T>(src: T)
-// TODO: pub fn as_str(&self)
-// TODO: impl Clone, Display, FromStr, Hash, PartialEq, PartialOrd, Eq, TryFrom<&'a [u8]>, TryFrom<&'a str>, TryFrom<String>, TryFrom<Vec<u8>>
 /// [`http::uri::PathAndQuery`] newtype without query
-#[derive(Debug)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd)]
 pub struct Path(http::uri::PathAndQuery);
+
+impl Path {
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl core::fmt::Display for Path {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl AsRef<http::uri::PathAndQuery> for Path {
     fn as_ref(&self) -> &http::uri::PathAndQuery {
@@ -101,9 +195,28 @@ impl PartialEq<http::uri::PathAndQuery> for Path {
     }
 }
 
-// TODO: impl Error, Display
+impl PartialOrd<str> for Path {
+    fn partial_cmp(&self, other: &str) -> Option<core::cmp::Ordering> {
+        self.0.partial_cmp(other)
+    }
+}
+
+impl PartialOrd<http::uri::PathAndQuery> for Path {
+    fn partial_cmp(&self, other: &http::uri::PathAndQuery) -> Option<core::cmp::Ordering> {
+        self.0.partial_cmp(other)
+    }
+}
+
 #[derive(Debug)]
 pub struct InvalidPathError(());
+
+impl core::fmt::Display for InvalidPathError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "invalid scheme")
+    }
+}
+
+impl core::error::Error for InvalidPathError {}
 
 impl TryFrom<http::uri::PathAndQuery> for Path {
     type Error = InvalidPathError;
@@ -117,15 +230,66 @@ impl TryFrom<http::uri::PathAndQuery> for Path {
     }
 }
 
+impl FromStr for Path {
+    type Err = InvalidPathError;
+
+    fn from_str(s: &str) -> Result<Self, InvalidPathError> {
+        let path = http::uri::PathAndQuery::from_str(s).map_err(|_e| InvalidPathError(()))?;
+
+        path.try_into()
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for Path {
+    type Error = InvalidPathError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, InvalidPathError> {
+        let path = http::uri::PathAndQuery::try_from(value).map_err(|_e| InvalidPathError(()))?;
+
+        path.try_into()
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Path {
+    type Error = InvalidPathError;
+
+    fn try_from(value: &'a str) -> Result<Self, InvalidPathError> {
+        let path = http::uri::PathAndQuery::try_from(value).map_err(|_e| InvalidPathError(()))?;
+
+        path.try_into()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> TryFrom<alloc::string::String> for Path {
+    type Error = InvalidPathError;
+
+    fn try_from(value: alloc::string::String) -> Result<Self, InvalidPathError> {
+        let path = http::uri::PathAndQuery::try_from(value).map_err(|_e| InvalidPathError(()))?;
+
+        path.try_into()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> TryFrom<alloc::vec::Vec<u8>> for Path {
+    type Error = InvalidPathError;
+
+    fn try_from(value: alloc::vec::Vec<u8>) -> Result<Self, InvalidPathError> {
+        let path = http::uri::PathAndQuery::try_from(value).map_err(|_e| InvalidPathError(()))?;
+
+        path.try_into()
+    }
+}
+
 // TODO: join PathAndQuery ?
 // TODO: AsRef Scheme, Authority, PathAndQuery ?
 // TODO: pub fn from_parts(src: Parts)
 // TODO: pub fn from_maybe_shared<T>(src: T)
 // TODO: pub fn from_static(src: &'static str)
 // TODO: pub fn into_parts(self)
-// TODO: impl Clone, Display, Hash, PartialEq, TryFrom<&'a [u8]>, TryFrom<&'a str>, TryFrom<(parts)>, TryFrom<String>, TryFrom<Vec<u8>>, Eq
 /// [`http::uri::Uri`] with [`HttpScheme`] and [`Path`] instead
-#[derive(Debug)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HttpBaseUri {
     scheme: HttpScheme,
     authority: http::uri::Authority,
@@ -143,6 +307,18 @@ impl HttpBaseUri {
 
     pub const fn path(&self) -> &Path {
         &self.path
+    }
+}
+
+impl core::fmt::Display for HttpBaseUri {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}://", self.scheme)?;
+
+        write!(f, "{}", self.authority)?;
+
+        write!(f, "{}", self.path)?;
+
+        Ok(())
     }
 }
 
@@ -220,6 +396,48 @@ impl FromStr for HttpBaseUri {
     }
 }
 
+impl<'a> TryFrom<&'a [u8]> for HttpBaseUri {
+    type Error = InvalidHttpUriError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, InvalidHttpUriError> {
+        let uri = http::uri::Uri::try_from(value).map_err(|_e| InvalidHttpUriError(()))?;
+
+        uri.try_into()
+    }
+}
+
+impl<'a> TryFrom<&'a str> for HttpBaseUri {
+    type Error = InvalidHttpUriError;
+
+    fn try_from(value: &'a str) -> Result<Self, InvalidHttpUriError> {
+        let uri = http::uri::Uri::try_from(value).map_err(|_e| InvalidHttpUriError(()))?;
+
+        uri.try_into()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> TryFrom<alloc::string::String> for HttpBaseUri {
+    type Error = InvalidHttpUriError;
+
+    fn try_from(value: alloc::string::String) -> Result<Self, InvalidHttpUriError> {
+        let uri = http::uri::Uri::try_from(value).map_err(|_e| InvalidHttpUriError(()))?;
+
+        uri.try_into()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> TryFrom<alloc::vec::Vec<u8>> for HttpBaseUri {
+    type Error = InvalidHttpUriError;
+
+    fn try_from(value: alloc::vec::Vec<u8>) -> Result<Self, InvalidHttpUriError> {
+        let uri = http::uri::Uri::try_from(value).map_err(|_e| InvalidHttpUriError(()))?;
+
+        uri.try_into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,11 +453,72 @@ mod tests {
     }
 
     #[test]
+    fn httpscheme_into() -> Result<(), Box<dyn std::error::Error>> {
+        let http_scheme = HttpScheme::HTTPS;
+        let scheme: http::uri::Scheme = http_scheme.into();
+        assert_eq!(scheme, http::uri::Scheme::HTTPS);
+
+        Ok(())
+    }
+
+    #[test]
+    fn httpscheme_eq() -> Result<(), Box<dyn std::error::Error>> {
+        let http_scheme = HttpScheme::HTTPS;
+        assert_eq!(http_scheme, *"https");
+
+        Ok(())
+    }
+
+    #[test]
+    fn httpscheme_fromstr() -> Result<(), Box<dyn std::error::Error>> {
+        let http_scheme = HttpScheme::from_str("https")?;
+        assert_eq!(http_scheme, HttpScheme::HTTPS);
+
+        Ok(())
+    }
+
+    #[test]
     fn path_tryfrom() -> Result<(), Box<dyn std::error::Error>> {
         let invalid_pathandquery = http::uri::PathAndQuery::from_str("/resource?param=value")?;
 
         let path = Path::try_from(invalid_pathandquery);
         assert!(path.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn path_into() -> Result<(), Box<dyn std::error::Error>> {
+        let path = Path::from_str("/resource")?;
+        let pathandquery: http::uri::PathAndQuery = path.into();
+        assert_eq!(
+            pathandquery,
+            http::uri::PathAndQuery::from_str("/resource")?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn httpbaseuri_tryfrom() -> Result<(), Box<dyn std::error::Error>> {
+        let invalid_httpbaseuri = "/resource?param=value";
+
+        let httpbaseuri = HttpBaseUri::try_from(invalid_httpbaseuri);
+        assert!(httpbaseuri.is_err());
+
+        let invalid_httpbaseuri = "api.example.com";
+
+        let httpbaseuri = HttpBaseUri::try_from(invalid_httpbaseuri);
+        assert!(httpbaseuri.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn httpbaseuri_display() -> Result<(), Box<dyn std::error::Error>> {
+        let httpbaseuri = HttpBaseUri::try_from("https://api.example.com/rest/v2#frag1")?;
+
+        assert_eq!(format!("{httpbaseuri}"), "https://api.example.com/rest/v2");
 
         Ok(())
     }

@@ -13,9 +13,10 @@ maintenance = { status = "experimental" }
 [features]
 default = ["std"]
 std = [
-    # https://github.com/hyperium/http/issues/551
-    "http/std",
+    "alloc",
+    "http/std", # https://github.com/hyperium/http/issues/551
 ]
+alloc = []
 
 [dependencies]
 http = { version = "1", default-features = false }
