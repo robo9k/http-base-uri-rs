@@ -261,7 +261,7 @@ impl<'a> TryFrom<&'a str> for Path {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a> TryFrom<alloc::string::String> for Path {
+impl TryFrom<alloc::string::String> for Path {
     type Error = InvalidPathError;
 
     fn try_from(value: alloc::string::String) -> Result<Self, InvalidPathError> {
@@ -272,7 +272,7 @@ impl<'a> TryFrom<alloc::string::String> for Path {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a> TryFrom<alloc::vec::Vec<u8>> for Path {
+impl TryFrom<alloc::vec::Vec<u8>> for Path {
     type Error = InvalidPathError;
 
     fn try_from(value: alloc::vec::Vec<u8>) -> Result<Self, InvalidPathError> {
@@ -417,7 +417,7 @@ impl<'a> TryFrom<&'a str> for HttpBaseUri {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a> TryFrom<alloc::string::String> for HttpBaseUri {
+impl TryFrom<alloc::string::String> for HttpBaseUri {
     type Error = InvalidHttpUriError;
 
     fn try_from(value: alloc::string::String) -> Result<Self, InvalidHttpUriError> {
@@ -428,7 +428,7 @@ impl<'a> TryFrom<alloc::string::String> for HttpBaseUri {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a> TryFrom<alloc::vec::Vec<u8>> for HttpBaseUri {
+impl TryFrom<alloc::vec::Vec<u8>> for HttpBaseUri {
     type Error = InvalidHttpUriError;
 
     fn try_from(value: alloc::vec::Vec<u8>) -> Result<Self, InvalidHttpUriError> {
