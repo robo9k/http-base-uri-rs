@@ -1,4 +1,4 @@
-//! HTTP/S base URI for API clients
+//! HTTP/S base URI with optional path and no query - for API clients
 //!
 //! ```rust
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {

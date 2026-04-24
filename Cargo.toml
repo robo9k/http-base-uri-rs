@@ -3,9 +3,21 @@ name = "http-base-uri"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
+description = "HTTP/S base `http::Uri` subset for HTTP clients"
 repository = "https://github.com/robo9k/http-base-uri-rs.git"
-categories = ["web-programming"]
+license = "MIT OR Apache-2.0"
+keywords = ["URL"]
+categories = [
+    "web-programming",
+    "config",
+    "parser-implementations",
+]
 include = ["src/"]
+
+[package.metadata.docs.rs]
+targets = []
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [badges]
 maintenance = { status = "experimental" }
