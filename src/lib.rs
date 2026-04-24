@@ -14,7 +14,7 @@
 //! // HttpBaseUri is a subset of Uri
 //! let uri: http::Uri = base_uri.into();
 //!
-//! // also works with http and without path
+//! // also works with http scheme and without path
 //! let base_uri = "http://example.com".parse::<HttpBaseUri>()?;
 //!
 //! assert_eq!(base_uri.scheme(), "http");
@@ -346,13 +346,84 @@ impl TryFrom<alloc::vec::Vec<u8>> for Path {
     }
 }
 
+/// [`http::uri::Parts`] for [`HttpBaseUri`]
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct HttpBaseParts {
+    pub scheme: HttpScheme,
+
+    pub authority: http::uri::Authority,
+
+    pub path: Path,
+}
+
+impl TryFrom<http::uri::Parts> for HttpBaseParts {
+    type Error = InvalidUriError;
+
+    fn try_from(value: http::uri::Parts) -> Result<Self, InvalidUriError> {
+        let scheme: HttpScheme = if let Some(scheme) = value.scheme {
+            scheme
+                .try_into()
+                .map_err(|e| InvalidUriError(InvalidUriKind::InvalidScheme { source: e }))?
+        } else {
+            return Err(InvalidUriError(InvalidUriKind::MissingScheme));
+        };
+
+        let Some(authority) = value.authority else {
+            return Err(InvalidUriError(InvalidUriKind::MissingAuthority));
+        };
+
+        let path: Path = if let Some(path_and_query) = value.path_and_query {
+            path_and_query
+                .try_into()
+                .map_err(|e| InvalidUriError(InvalidUriKind::InvalidPathAndQuery { source: e }))?
+        } else {
+            return Err(InvalidUriError(InvalidUriKind::MissingPathAndQuery));
+        };
+
+        Ok(Self {
+            scheme,
+            authority,
+            path,
+        })
+    }
+}
+
+impl TryFrom<http::uri::Uri> for HttpBaseParts {
+    type Error = InvalidUriError;
+
+    fn try_from(value: http::uri::Uri) -> Result<Self, InvalidUriError> {
+        Self::try_from(value.into_parts())
+    }
+}
+
+impl From<HttpBaseParts> for http::uri::Parts {
+    fn from(value: HttpBaseParts) -> http::uri::Parts {
+        let mut parts = http::uri::Parts::default();
+
+        parts.scheme = Some(value.scheme.into());
+        parts.authority = Some(value.authority);
+        parts.path_and_query = Some(value.path.into());
+
+        parts
+    }
+}
+
+impl From<HttpBaseParts> for http::uri::Uri {
+    fn from(value: HttpBaseParts) -> http::uri::Uri {
+        let parts: http::uri::Parts = value.into();
+
+        http::uri::Uri::try_from(parts).expect("HttpHttpBaseParts are valid Uri")
+    }
+}
+
 // TODO: join PathAndQuery ?
 // TODO: AsRef Scheme, Authority, PathAndQuery ?
 // TODO: pub fn from_parts(src: Parts)
 // TODO: pub fn from_maybe_shared<T>(src: T)
 // TODO: pub fn from_static(src: &'static str)
 // TODO: pub fn into_parts(self)
-/// [`http::uri::Uri`] with [`HttpScheme`] and [`Path`] instead
+/// [`http::uri::Uri`] subset with [`HttpScheme`] and [`Path`] instead
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HttpBaseUri {
     scheme: HttpScheme,
@@ -372,6 +443,21 @@ impl HttpBaseUri {
     pub const fn path(&self) -> &Path {
         &self.path
     }
+
+    pub fn from_base_parts(src: HttpBaseParts) -> Self {
+        let HttpBaseParts {
+            scheme,
+            authority,
+            path,
+            ..
+        } = src;
+
+        Self {
+            scheme,
+            authority,
+            path,
+        }
+    }
 }
 
 impl core::fmt::Display for HttpBaseUri {
@@ -386,12 +472,20 @@ impl core::fmt::Display for HttpBaseUri {
     }
 }
 
-impl From<HttpBaseUri> for http::uri::Uri {
-    fn from(value: HttpBaseUri) -> http::uri::Uri {
+impl From<HttpBaseUri> for http::uri::Parts {
+    fn from(value: HttpBaseUri) -> http::uri::Parts {
         let mut parts = http::uri::Parts::default();
         parts.scheme = Some(value.scheme.0);
         parts.authority = Some(value.authority);
         parts.path_and_query = Some(value.path.0);
+
+        parts
+    }
+}
+
+impl From<HttpBaseUri> for http::uri::Uri {
+    fn from(value: HttpBaseUri) -> http::uri::Uri {
+        let parts: http::uri::Parts = value.into();
 
         http::uri::Uri::try_from(parts).expect("HttpBaseUri parts are valid Parts")
     }
@@ -451,31 +545,15 @@ impl TryFrom<http::uri::Parts> for HttpBaseUri {
     type Error = InvalidUriError;
 
     fn try_from(value: http::uri::Parts) -> Result<Self, InvalidUriError> {
-        let scheme: HttpScheme = if let Some(scheme) = value.scheme {
-            scheme
-                .try_into()
-                .map_err(|e| InvalidUriError(InvalidUriKind::InvalidScheme { source: e }))?
-        } else {
-            return Err(InvalidUriError(InvalidUriKind::MissingScheme));
-        };
+        let base_parts: HttpBaseParts = value.try_into()?;
 
-        let Some(authority) = value.authority else {
-            return Err(InvalidUriError(InvalidUriKind::MissingAuthority));
-        };
+        Ok(Self::from(base_parts))
+    }
+}
 
-        let path: Path = if let Some(path_and_query) = value.path_and_query {
-            path_and_query
-                .try_into()
-                .map_err(|e| InvalidUriError(InvalidUriKind::InvalidPathAndQuery { source: e }))?
-        } else {
-            return Err(InvalidUriError(InvalidUriKind::MissingPathAndQuery));
-        };
-
-        Ok(Self {
-            scheme,
-            authority,
-            path,
-        })
+impl From<HttpBaseParts> for HttpBaseUri {
+    fn from(value: HttpBaseParts) -> Self {
+        Self::from_base_parts(value)
     }
 }
 
