@@ -499,12 +499,11 @@ impl Uri {
         &self.path
     }
 
-    pub fn from_base_parts(src: Parts) -> Self {
+    pub fn from_parts(src: Parts) -> Self {
         let Parts {
             scheme,
             authority,
             path,
-            ..
         } = src;
 
         Self {
@@ -582,15 +581,15 @@ impl TryFrom<http::uri::Parts> for Uri {
     type Error = InvalidPartsError;
 
     fn try_from(value: http::uri::Parts) -> Result<Self, Self::Error> {
-        let base_parts: Parts = value.try_into()?;
+        let parts: Parts = value.try_into()?;
 
-        Ok(Self::from(base_parts))
+        Ok(Self::from(parts))
     }
 }
 
 impl From<Parts> for Uri {
     fn from(value: Parts) -> Self {
-        Self::from_base_parts(value)
+        Self::from_parts(value)
     }
 }
 
