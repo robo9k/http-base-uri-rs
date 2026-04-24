@@ -2,20 +2,18 @@
 //!
 //! ```rust
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! use http_base_uri::HttpBaseUri;
-//!
 //! // Look Ma'; scheme and authority and path, but no query!
-//! let base_uri = "https://api.example.com/rest/v2".parse::<HttpBaseUri>()?;
+//! let base_uri = "https://api.example.com/rest/v2".parse::<http_base_uri::Uri>()?;
 //!
 //! assert_eq!(base_uri.scheme(), &http::uri::Scheme::HTTPS);
 //! assert_eq!(base_uri.authority(), "api.example.com");
 //! assert_eq!(base_uri.path(), "/rest/v2");
 //!
-//! // HttpBaseUri is a subset of Uri
+//! // http_base_uri::Uri is a subset of http::Uri
 //! let uri: http::Uri = base_uri.into();
 //!
 //! // also works with http scheme and without path
-//! let base_uri = "http://example.com".parse::<HttpBaseUri>()?;
+//! let base_uri = "http://example.com".parse::<http_base_uri::Uri>()?;
 //!
 //! assert_eq!(base_uri.scheme(), "http");
 //! assert_eq!(base_uri.authority(), "example.com");
@@ -23,19 +21,19 @@
 //!
 //! // invalid; has query
 //! let not_a_base_uri = "https://api.example.com/rest/v2?param=value";
-//! assert!(not_a_base_uri.parse::<HttpBaseUri>().is_err());
+//! assert!(not_a_base_uri.parse::<http_base_uri::Uri>().is_err());
 //!
 //! // invalid; missing scheme
 //! let not_a_base_uri_either = "api.example.com";
-//! assert!(not_a_base_uri_either.parse::<HttpBaseUri>().is_err());
+//! assert!(not_a_base_uri_either.parse::<http_base_uri::Uri>().is_err());
 //!
 //! // invalid; wrong scheme - come on now, it's in the name!
 //! let seriously_not_a_base_uri = "ftp://api.example.com";
-//! assert!(seriously_not_a_base_uri.parse::<HttpBaseUri>().is_err());
+//! assert!(seriously_not_a_base_uri.parse::<http_base_uri::Uri>().is_err());
 //!
 //! struct MyHttpApiClient {
 //!     // typesafe, correct by construction 😌
-//!     base_uri: HttpBaseUri,
+//!     base_uri: http_base_uri::Uri,
 //! }
 //! # Ok(())
 //! # }
@@ -52,9 +50,9 @@ use core::str::FromStr;
 
 /// [`http::uri::Scheme`] newtype that is either HTTP or HTTPS
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct HttpScheme(http::uri::Scheme);
+pub struct Scheme(http::uri::Scheme);
 
-impl HttpScheme {
+impl Scheme {
     pub const HTTP: Self = Self(http::uri::Scheme::HTTP);
     pub const HTTPS: Self = Self(http::uri::Scheme::HTTPS);
 
@@ -63,43 +61,43 @@ impl HttpScheme {
     }
 }
 
-impl core::fmt::Display for HttpScheme {
+impl core::fmt::Display for Scheme {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl AsRef<http::uri::Scheme> for HttpScheme {
+impl AsRef<http::uri::Scheme> for Scheme {
     fn as_ref(&self) -> &http::uri::Scheme {
         &self.0
     }
 }
 
-impl AsRef<str> for HttpScheme {
+impl AsRef<str> for Scheme {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
 }
 
-impl From<HttpScheme> for http::uri::Scheme {
-    fn from(value: HttpScheme) -> Self {
+impl From<Scheme> for http::uri::Scheme {
+    fn from(value: Scheme) -> Self {
         value.0
     }
 }
 
-impl PartialEq<http::uri::Scheme> for HttpScheme {
+impl PartialEq<http::uri::Scheme> for Scheme {
     fn eq(&self, other: &http::uri::Scheme) -> bool {
         self.0 == *other
     }
 }
 
-impl PartialEq<str> for HttpScheme {
+impl PartialEq<str> for Scheme {
     fn eq(&self, other: &str) -> bool {
         self.0 == *other
     }
 }
 
-/// [`Error`](core::error::Error) for [`HttpScheme`]
+/// [`Error`](core::error::Error) for [`Scheme`]
 #[derive(Debug)]
 pub struct InvalidSchemeError(InvalidSchemeKind);
 
@@ -131,7 +129,7 @@ impl core::error::Error for InvalidSchemeError {
     }
 }
 
-impl TryFrom<http::uri::Scheme> for HttpScheme {
+impl TryFrom<http::uri::Scheme> for Scheme {
     type Error = InvalidSchemeError;
 
     fn try_from(value: http::uri::Scheme) -> Result<Self, InvalidSchemeError> {
@@ -145,7 +143,7 @@ impl TryFrom<http::uri::Scheme> for HttpScheme {
     }
 }
 
-impl FromStr for HttpScheme {
+impl FromStr for Scheme {
     type Err = InvalidSchemeError;
 
     fn from_str(s: &str) -> Result<Self, InvalidSchemeError> {
@@ -156,7 +154,7 @@ impl FromStr for HttpScheme {
     }
 }
 
-impl<'a> TryFrom<&'a [u8]> for HttpScheme {
+impl<'a> TryFrom<&'a [u8]> for Scheme {
     type Error = InvalidSchemeError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, InvalidSchemeError> {
@@ -167,7 +165,7 @@ impl<'a> TryFrom<&'a [u8]> for HttpScheme {
     }
 }
 
-impl<'a> TryFrom<&'a str> for HttpScheme {
+impl<'a> TryFrom<&'a str> for Scheme {
     type Error = InvalidSchemeError;
 
     fn try_from(value: &'a str) -> Result<Self, InvalidSchemeError> {
@@ -346,22 +344,22 @@ impl TryFrom<alloc::vec::Vec<u8>> for Path {
     }
 }
 
-/// [`http::uri::Parts`] for [`HttpBaseUri`]
+/// [`http::uri::Parts`] for [`Uri`]
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct HttpBaseParts {
-    pub scheme: HttpScheme,
+pub struct Parts {
+    pub scheme: Scheme,
 
     pub authority: http::uri::Authority,
 
     pub path: Path,
 }
 
-impl TryFrom<http::uri::Parts> for HttpBaseParts {
+impl TryFrom<http::uri::Parts> for Parts {
     type Error = InvalidUriError;
 
     fn try_from(value: http::uri::Parts) -> Result<Self, InvalidUriError> {
-        let scheme: HttpScheme = if let Some(scheme) = value.scheme {
+        let scheme: Scheme = if let Some(scheme) = value.scheme {
             scheme
                 .try_into()
                 .map_err(|e| InvalidUriError(InvalidUriKind::InvalidScheme { source: e }))?
@@ -389,7 +387,7 @@ impl TryFrom<http::uri::Parts> for HttpBaseParts {
     }
 }
 
-impl TryFrom<http::uri::Uri> for HttpBaseParts {
+impl TryFrom<http::uri::Uri> for Parts {
     type Error = InvalidUriError;
 
     fn try_from(value: http::uri::Uri) -> Result<Self, InvalidUriError> {
@@ -397,8 +395,8 @@ impl TryFrom<http::uri::Uri> for HttpBaseParts {
     }
 }
 
-impl From<HttpBaseParts> for http::uri::Parts {
-    fn from(value: HttpBaseParts) -> http::uri::Parts {
+impl From<Parts> for http::uri::Parts {
+    fn from(value: Parts) -> http::uri::Parts {
         let mut parts = http::uri::Parts::default();
 
         parts.scheme = Some(value.scheme.into());
@@ -409,11 +407,11 @@ impl From<HttpBaseParts> for http::uri::Parts {
     }
 }
 
-impl From<HttpBaseParts> for http::uri::Uri {
-    fn from(value: HttpBaseParts) -> http::uri::Uri {
+impl From<Parts> for http::uri::Uri {
+    fn from(value: Parts) -> http::uri::Uri {
         let parts: http::uri::Parts = value.into();
 
-        http::uri::Uri::try_from(parts).expect("HttpHttpBaseParts are valid Uri")
+        http::uri::Uri::try_from(parts).expect("Parts are valid http::uri::Uri")
     }
 }
 
@@ -423,16 +421,16 @@ impl From<HttpBaseParts> for http::uri::Uri {
 // TODO: pub fn from_maybe_shared<T>(src: T)
 // TODO: pub fn from_static(src: &'static str)
 // TODO: pub fn into_parts(self)
-/// [`http::uri::Uri`] subset with [`HttpScheme`] and [`Path`] instead
+/// [`http::uri::Uri`] subset with [`crate::Scheme`] and [`Path`] instead
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct HttpBaseUri {
-    scheme: HttpScheme,
+pub struct Uri {
+    scheme: Scheme,
     authority: http::uri::Authority,
     path: Path,
 }
 
-impl HttpBaseUri {
-    pub const fn scheme(&self) -> &HttpScheme {
+impl Uri {
+    pub const fn scheme(&self) -> &Scheme {
         &self.scheme
     }
 
@@ -444,8 +442,8 @@ impl HttpBaseUri {
         &self.path
     }
 
-    pub fn from_base_parts(src: HttpBaseParts) -> Self {
-        let HttpBaseParts {
+    pub fn from_base_parts(src: Parts) -> Self {
+        let Parts {
             scheme,
             authority,
             path,
@@ -460,7 +458,7 @@ impl HttpBaseUri {
     }
 }
 
-impl core::fmt::Display for HttpBaseUri {
+impl core::fmt::Display for Uri {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "{}://", self.scheme)?;
 
@@ -472,8 +470,8 @@ impl core::fmt::Display for HttpBaseUri {
     }
 }
 
-impl From<HttpBaseUri> for http::uri::Parts {
-    fn from(value: HttpBaseUri) -> http::uri::Parts {
+impl From<Uri> for http::uri::Parts {
+    fn from(value: Uri) -> http::uri::Parts {
         let mut parts = http::uri::Parts::default();
         parts.scheme = Some(value.scheme.0);
         parts.authority = Some(value.authority);
@@ -483,15 +481,15 @@ impl From<HttpBaseUri> for http::uri::Parts {
     }
 }
 
-impl From<HttpBaseUri> for http::uri::Uri {
-    fn from(value: HttpBaseUri) -> http::uri::Uri {
+impl From<Uri> for http::uri::Uri {
+    fn from(value: Uri) -> http::uri::Uri {
         let parts: http::uri::Parts = value.into();
 
-        http::uri::Uri::try_from(parts).expect("HttpBaseUri parts are valid Parts")
+        http::uri::Uri::try_from(parts).expect("Parts are valid http::uri::Uri")
     }
 }
 
-/// [`Error`](core::error::Error) for [`HttpBaseUri`]
+/// [`Error`](core::error::Error) for [`Uri`]
 #[derive(Debug)]
 pub struct InvalidUriError(InvalidUriKind);
 
@@ -541,23 +539,23 @@ impl core::error::Error for InvalidUriError {
     }
 }
 
-impl TryFrom<http::uri::Parts> for HttpBaseUri {
+impl TryFrom<http::uri::Parts> for Uri {
     type Error = InvalidUriError;
 
     fn try_from(value: http::uri::Parts) -> Result<Self, InvalidUriError> {
-        let base_parts: HttpBaseParts = value.try_into()?;
+        let base_parts: Parts = value.try_into()?;
 
         Ok(Self::from(base_parts))
     }
 }
 
-impl From<HttpBaseParts> for HttpBaseUri {
-    fn from(value: HttpBaseParts) -> Self {
+impl From<Parts> for Uri {
+    fn from(value: Parts) -> Self {
         Self::from_base_parts(value)
     }
 }
 
-impl TryFrom<http::uri::Uri> for HttpBaseUri {
+impl TryFrom<http::uri::Uri> for Uri {
     type Error = InvalidUriError;
 
     fn try_from(value: http::uri::Uri) -> Result<Self, InvalidUriError> {
@@ -567,7 +565,7 @@ impl TryFrom<http::uri::Uri> for HttpBaseUri {
     }
 }
 
-impl FromStr for HttpBaseUri {
+impl FromStr for Uri {
     type Err = InvalidUriError;
 
     fn from_str(s: &str) -> Result<Self, InvalidUriError> {
@@ -578,7 +576,7 @@ impl FromStr for HttpBaseUri {
     }
 }
 
-impl<'a> TryFrom<&'a [u8]> for HttpBaseUri {
+impl<'a> TryFrom<&'a [u8]> for Uri {
     type Error = InvalidUriError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, InvalidUriError> {
@@ -589,7 +587,7 @@ impl<'a> TryFrom<&'a [u8]> for HttpBaseUri {
     }
 }
 
-impl<'a> TryFrom<&'a str> for HttpBaseUri {
+impl<'a> TryFrom<&'a str> for Uri {
     type Error = InvalidUriError;
 
     fn try_from(value: &'a str) -> Result<Self, InvalidUriError> {
@@ -601,7 +599,7 @@ impl<'a> TryFrom<&'a str> for HttpBaseUri {
 }
 
 #[cfg(feature = "alloc")]
-impl TryFrom<alloc::string::String> for HttpBaseUri {
+impl TryFrom<alloc::string::String> for Uri {
     type Error = InvalidUriError;
 
     fn try_from(value: alloc::string::String) -> Result<Self, InvalidUriError> {
@@ -613,7 +611,7 @@ impl TryFrom<alloc::string::String> for HttpBaseUri {
 }
 
 #[cfg(feature = "alloc")]
-impl TryFrom<alloc::vec::Vec<u8>> for HttpBaseUri {
+impl TryFrom<alloc::vec::Vec<u8>> for Uri {
     type Error = InvalidUriError;
 
     fn try_from(value: alloc::vec::Vec<u8>) -> Result<Self, InvalidUriError> {
@@ -629,36 +627,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn httpscheme_tryfrom() -> Result<(), Box<dyn std::error::Error>> {
+    fn scheme_tryfrom() -> Result<(), Box<dyn std::error::Error>> {
         let invalid_scheme = http::uri::Scheme::from_str("ftp")?;
 
-        let http_scheme = HttpScheme::try_from(invalid_scheme);
-        assert_eq!(http_scheme.unwrap_err().to_string(), "invalid scheme: ftp");
+        let scheme = Scheme::try_from(invalid_scheme);
+        assert_eq!(scheme.unwrap_err().to_string(), "invalid scheme: ftp");
 
         Ok(())
     }
 
     #[test]
-    fn httpscheme_into() -> Result<(), Box<dyn std::error::Error>> {
-        let http_scheme = HttpScheme::HTTPS;
-        let scheme: http::uri::Scheme = http_scheme.into();
+    fn scheme_into() -> Result<(), Box<dyn std::error::Error>> {
+        let scheme = Scheme::HTTPS;
+        let scheme: http::uri::Scheme = scheme.into();
         assert_eq!(scheme, http::uri::Scheme::HTTPS);
 
         Ok(())
     }
 
     #[test]
-    fn httpscheme_eq() -> Result<(), Box<dyn std::error::Error>> {
-        let http_scheme = HttpScheme::HTTPS;
-        assert_eq!(http_scheme, *"https");
+    fn scheme_eq() -> Result<(), Box<dyn std::error::Error>> {
+        let scheme = Scheme::HTTPS;
+        assert_eq!(scheme, *"https");
 
         Ok(())
     }
 
     #[test]
-    fn httpscheme_fromstr() -> Result<(), Box<dyn std::error::Error>> {
-        let http_scheme = HttpScheme::from_str("https")?;
-        assert_eq!(http_scheme, HttpScheme::HTTPS);
+    fn cheme_fromstr() -> Result<(), Box<dyn std::error::Error>> {
+        let scheme = Scheme::from_str("https")?;
+        assert_eq!(scheme, Scheme::HTTPS);
 
         Ok(())
     }
@@ -686,25 +684,25 @@ mod tests {
     }
 
     #[test]
-    fn httpbaseuri_tryfrom() -> Result<(), Box<dyn std::error::Error>> {
-        let invalid_httpbaseuri = "/resource?param=value";
+    fn uri_tryfrom() -> Result<(), Box<dyn std::error::Error>> {
+        let invalid_uri = "/resource?param=value";
 
-        let httpbaseuri = HttpBaseUri::try_from(invalid_httpbaseuri);
-        assert_eq!(httpbaseuri.unwrap_err().to_string(), "missing scheme");
+        let uri = Uri::try_from(invalid_uri);
+        assert_eq!(uri.unwrap_err().to_string(), "missing scheme");
 
-        let invalid_httpbaseuri = "api.example.com";
+        let invalid_uri = "api.example.com";
 
-        let httpbaseuri = HttpBaseUri::try_from(invalid_httpbaseuri);
-        assert_eq!(httpbaseuri.unwrap_err().to_string(), "missing scheme");
+        let uri = Uri::try_from(invalid_uri);
+        assert_eq!(uri.unwrap_err().to_string(), "missing scheme");
 
         Ok(())
     }
 
     #[test]
-    fn httpbaseuri_display() -> Result<(), Box<dyn std::error::Error>> {
-        let httpbaseuri = HttpBaseUri::try_from("https://api.example.com/rest/v2#frag1")?;
+    fn uri_display() -> Result<(), Box<dyn std::error::Error>> {
+        let uri = Uri::try_from("https://api.example.com/rest/v2#frag1")?;
 
-        assert_eq!(format!("{httpbaseuri}"), "https://api.example.com/rest/v2");
+        assert_eq!(format!("{uri}"), "https://api.example.com/rest/v2");
 
         Ok(())
     }
