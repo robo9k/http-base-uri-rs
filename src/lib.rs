@@ -355,6 +355,16 @@ pub struct Parts {
     pub path: Path,
 }
 
+impl Parts {
+    pub const fn new(scheme: Scheme, authority: http::uri::Authority, path: Path) -> Self {
+        Self {
+            authority,
+            scheme,
+            path,
+        }
+    }
+}
+
 /// [`Error`](core::error::Error) for [`Parts`]
 #[derive(Debug)]
 pub struct InvalidPartsError(InvalidPartsKind);
