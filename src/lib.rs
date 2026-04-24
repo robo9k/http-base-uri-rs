@@ -99,16 +99,37 @@ impl PartialEq<str> for HttpScheme {
     }
 }
 
+/// [`Error`](core::error::Error) for [`HttpScheme`]
 #[derive(Debug)]
-pub struct InvalidSchemeError(());
+pub struct InvalidSchemeError(InvalidSchemeKind);
+
+#[derive(Debug)]
+enum InvalidSchemeKind {
+    ParseScheme { source: http::uri::InvalidUri },
+    NotHttp { scheme: http::uri::Scheme },
+}
 
 impl core::fmt::Display for InvalidSchemeError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "invalid scheme")
+        match self {
+            InvalidSchemeError(InvalidSchemeKind::ParseScheme { .. }) => {
+                write!(f, "could not parse scheme")
+            }
+            InvalidSchemeError(InvalidSchemeKind::NotHttp { scheme }) => {
+                write!(f, "invalid scheme: {scheme}")
+            }
+        }
     }
 }
 
-impl core::error::Error for InvalidSchemeError {}
+impl core::error::Error for InvalidSchemeError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            InvalidSchemeError(InvalidSchemeKind::ParseScheme { source }) => Some(source),
+            InvalidSchemeError(InvalidSchemeKind::NotHttp { .. }) => None,
+        }
+    }
+}
 
 impl TryFrom<http::uri::Scheme> for HttpScheme {
     type Error = InvalidSchemeError;
@@ -117,7 +138,9 @@ impl TryFrom<http::uri::Scheme> for HttpScheme {
         if value == http::uri::Scheme::HTTP || value == http::uri::Scheme::HTTPS {
             Ok(Self(value))
         } else {
-            Err(InvalidSchemeError(()))
+            Err(InvalidSchemeError(InvalidSchemeKind::NotHttp {
+                scheme: value,
+            }))
         }
     }
 }
@@ -126,7 +149,8 @@ impl FromStr for HttpScheme {
     type Err = InvalidSchemeError;
 
     fn from_str(s: &str) -> Result<Self, InvalidSchemeError> {
-        let scheme = http::uri::Scheme::from_str(s).map_err(|_e| InvalidSchemeError(()))?;
+        let scheme = http::uri::Scheme::from_str(s)
+            .map_err(|e| InvalidSchemeError(InvalidSchemeKind::ParseScheme { source: e }))?;
 
         scheme.try_into()
     }
@@ -136,7 +160,8 @@ impl<'a> TryFrom<&'a [u8]> for HttpScheme {
     type Error = InvalidSchemeError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, InvalidSchemeError> {
-        let scheme = http::uri::Scheme::try_from(value).map_err(|_e| InvalidSchemeError(()))?;
+        let scheme = http::uri::Scheme::try_from(value)
+            .map_err(|e| InvalidSchemeError(InvalidSchemeKind::ParseScheme { source: e }))?;
 
         scheme.try_into()
     }
@@ -146,7 +171,8 @@ impl<'a> TryFrom<&'a str> for HttpScheme {
     type Error = InvalidSchemeError;
 
     fn try_from(value: &'a str) -> Result<Self, InvalidSchemeError> {
-        let scheme = http::uri::Scheme::try_from(value).map_err(|_e| InvalidSchemeError(()))?;
+        let scheme = http::uri::Scheme::try_from(value)
+            .map_err(|e| InvalidSchemeError(InvalidSchemeKind::ParseScheme { source: e }))?;
 
         scheme.try_into()
     }
@@ -207,16 +233,47 @@ impl PartialOrd<http::uri::PathAndQuery> for Path {
     }
 }
 
+/// [`Error`](core::error::Error) for [`Path`]
 #[derive(Debug)]
-pub struct InvalidPathError(());
+pub struct InvalidPathError(InvalidPathKind);
+
+#[derive(Debug)]
+enum InvalidPathKind {
+    ParsePathAndQuery {
+        source: http::uri::InvalidUri,
+    },
+    HasQuery {
+        path_and_query: http::uri::PathAndQuery,
+    },
+}
 
 impl core::fmt::Display for InvalidPathError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "invalid scheme")
+        match self {
+            InvalidPathError(InvalidPathKind::ParsePathAndQuery { .. }) => {
+                write!(f, "could not parse scheme")
+            }
+            InvalidPathError(InvalidPathKind::HasQuery { path_and_query }) => {
+                write!(
+                    f,
+                    "has query: {}",
+                    path_and_query
+                        .query()
+                        .expect("PathAndQuery has query as validated previously")
+                )
+            }
+        }
     }
 }
 
-impl core::error::Error for InvalidPathError {}
+impl core::error::Error for InvalidPathError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            InvalidPathError(InvalidPathKind::ParsePathAndQuery { source }) => Some(source),
+            InvalidPathError(InvalidPathKind::HasQuery { .. }) => None,
+        }
+    }
+}
 
 impl TryFrom<http::uri::PathAndQuery> for Path {
     type Error = InvalidPathError;
@@ -225,7 +282,9 @@ impl TryFrom<http::uri::PathAndQuery> for Path {
         if value.query().is_none() {
             Ok(Self(value))
         } else {
-            Err(InvalidPathError(()))
+            Err(InvalidPathError(InvalidPathKind::HasQuery {
+                path_and_query: value,
+            }))
         }
     }
 }
@@ -234,7 +293,8 @@ impl FromStr for Path {
     type Err = InvalidPathError;
 
     fn from_str(s: &str) -> Result<Self, InvalidPathError> {
-        let path = http::uri::PathAndQuery::from_str(s).map_err(|_e| InvalidPathError(()))?;
+        let path = http::uri::PathAndQuery::from_str(s)
+            .map_err(|e| InvalidPathError(InvalidPathKind::ParsePathAndQuery { source: e }))?;
 
         path.try_into()
     }
@@ -244,7 +304,8 @@ impl<'a> TryFrom<&'a [u8]> for Path {
     type Error = InvalidPathError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, InvalidPathError> {
-        let path = http::uri::PathAndQuery::try_from(value).map_err(|_e| InvalidPathError(()))?;
+        let path = http::uri::PathAndQuery::try_from(value)
+            .map_err(|e| InvalidPathError(InvalidPathKind::ParsePathAndQuery { source: e }))?;
 
         path.try_into()
     }
@@ -254,7 +315,8 @@ impl<'a> TryFrom<&'a str> for Path {
     type Error = InvalidPathError;
 
     fn try_from(value: &'a str) -> Result<Self, InvalidPathError> {
-        let path = http::uri::PathAndQuery::try_from(value).map_err(|_e| InvalidPathError(()))?;
+        let path = http::uri::PathAndQuery::try_from(value)
+            .map_err(|e| InvalidPathError(InvalidPathKind::ParsePathAndQuery { source: e }))?;
 
         path.try_into()
     }
@@ -265,7 +327,8 @@ impl TryFrom<alloc::string::String> for Path {
     type Error = InvalidPathError;
 
     fn try_from(value: alloc::string::String) -> Result<Self, InvalidPathError> {
-        let path = http::uri::PathAndQuery::try_from(value).map_err(|_e| InvalidPathError(()))?;
+        let path = http::uri::PathAndQuery::try_from(value)
+            .map_err(|e| InvalidPathError(InvalidPathKind::ParsePathAndQuery { source: e }))?;
 
         path.try_into()
     }
@@ -276,7 +339,8 @@ impl TryFrom<alloc::vec::Vec<u8>> for Path {
     type Error = InvalidPathError;
 
     fn try_from(value: alloc::vec::Vec<u8>) -> Result<Self, InvalidPathError> {
-        let path = http::uri::PathAndQuery::try_from(value).map_err(|_e| InvalidPathError(()))?;
+        let path = http::uri::PathAndQuery::try_from(value)
+            .map_err(|e| InvalidPathError(InvalidPathKind::ParsePathAndQuery { source: e }))?;
 
         path.try_into()
     }
@@ -333,37 +397,78 @@ impl From<HttpBaseUri> for http::uri::Uri {
     }
 }
 
+/// [`Error`](core::error::Error) for [`HttpBaseUri`]
 #[derive(Debug)]
-pub struct InvalidHttpUriError(());
+pub struct InvalidUriError(InvalidUriKind);
 
-impl core::fmt::Display for InvalidHttpUriError {
+#[derive(Debug)]
+enum InvalidUriKind {
+    ParseUri { source: http::uri::InvalidUri },
+    InvalidScheme { source: InvalidSchemeError },
+    MissingScheme,
+    MissingAuthority,
+    InvalidPathAndQuery { source: InvalidPathError },
+    MissingPathAndQuery,
+}
+
+impl core::fmt::Display for InvalidUriError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "invalid HTTP URI")
+        match self {
+            InvalidUriError(InvalidUriKind::ParseUri { .. }) => {
+                write!(f, "could not parse Uri")
+            }
+            InvalidUriError(InvalidUriKind::InvalidScheme { .. }) => {
+                write!(f, "invalid scheme")
+            }
+            InvalidUriError(InvalidUriKind::MissingScheme) => write!(f, "missing scheme"),
+            InvalidUriError(InvalidUriKind::MissingAuthority) => {
+                write!(f, "missing authority")
+            }
+            InvalidUriError(InvalidUriKind::InvalidPathAndQuery { .. }) => {
+                write!(f, "invald path and query")
+            }
+            InvalidUriError(InvalidUriKind::MissingPathAndQuery) => {
+                write!(f, "missing path and query")
+            }
+        }
     }
 }
 
-impl core::error::Error for InvalidHttpUriError {}
+impl core::error::Error for InvalidUriError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            InvalidUriError(InvalidUriKind::ParseUri { source }) => Some(source),
+            InvalidUriError(InvalidUriKind::InvalidScheme { source }) => Some(source),
+            InvalidUriError(InvalidUriKind::MissingScheme) => None,
+            InvalidUriError(InvalidUriKind::MissingAuthority) => None,
+            InvalidUriError(InvalidUriKind::InvalidPathAndQuery { source }) => Some(source),
+            InvalidUriError(InvalidUriKind::MissingPathAndQuery) => None,
+        }
+    }
+}
 
 impl TryFrom<http::uri::Parts> for HttpBaseUri {
-    type Error = InvalidHttpUriError;
+    type Error = InvalidUriError;
 
-    fn try_from(value: http::uri::Parts) -> Result<Self, InvalidHttpUriError> {
+    fn try_from(value: http::uri::Parts) -> Result<Self, InvalidUriError> {
         let scheme: HttpScheme = if let Some(scheme) = value.scheme {
-            scheme.try_into().map_err(|_e| InvalidHttpUriError(()))?
+            scheme
+                .try_into()
+                .map_err(|e| InvalidUriError(InvalidUriKind::InvalidScheme { source: e }))?
         } else {
-            return Err(InvalidHttpUriError(()));
+            return Err(InvalidUriError(InvalidUriKind::MissingScheme));
         };
 
         let Some(authority) = value.authority else {
-            return Err(InvalidHttpUriError(()));
+            return Err(InvalidUriError(InvalidUriKind::MissingAuthority));
         };
 
         let path: Path = if let Some(path_and_query) = value.path_and_query {
             path_and_query
                 .try_into()
-                .map_err(|_e| InvalidHttpUriError(()))?
+                .map_err(|e| InvalidUriError(InvalidUriKind::InvalidPathAndQuery { source: e }))?
         } else {
-            return Err(InvalidHttpUriError(()));
+            return Err(InvalidUriError(InvalidUriKind::MissingPathAndQuery));
         };
 
         Ok(Self {
@@ -375,9 +480,9 @@ impl TryFrom<http::uri::Parts> for HttpBaseUri {
 }
 
 impl TryFrom<http::uri::Uri> for HttpBaseUri {
-    type Error = InvalidHttpUriError;
+    type Error = InvalidUriError;
 
-    fn try_from(value: http::uri::Uri) -> Result<Self, InvalidHttpUriError> {
+    fn try_from(value: http::uri::Uri) -> Result<Self, InvalidUriError> {
         let parts = value.into_parts();
 
         parts.try_into()
@@ -385,30 +490,33 @@ impl TryFrom<http::uri::Uri> for HttpBaseUri {
 }
 
 impl FromStr for HttpBaseUri {
-    type Err = InvalidHttpUriError;
+    type Err = InvalidUriError;
 
-    fn from_str(s: &str) -> Result<Self, InvalidHttpUriError> {
-        let uri = http::uri::Uri::from_str(s).map_err(|_e| InvalidHttpUriError(()))?;
+    fn from_str(s: &str) -> Result<Self, InvalidUriError> {
+        let uri = http::uri::Uri::from_str(s)
+            .map_err(|e| InvalidUriError(InvalidUriKind::ParseUri { source: e }))?;
 
         uri.try_into()
     }
 }
 
 impl<'a> TryFrom<&'a [u8]> for HttpBaseUri {
-    type Error = InvalidHttpUriError;
+    type Error = InvalidUriError;
 
-    fn try_from(value: &'a [u8]) -> Result<Self, InvalidHttpUriError> {
-        let uri = http::uri::Uri::try_from(value).map_err(|_e| InvalidHttpUriError(()))?;
+    fn try_from(value: &'a [u8]) -> Result<Self, InvalidUriError> {
+        let uri = http::uri::Uri::try_from(value)
+            .map_err(|e| InvalidUriError(InvalidUriKind::ParseUri { source: e }))?;
 
         uri.try_into()
     }
 }
 
 impl<'a> TryFrom<&'a str> for HttpBaseUri {
-    type Error = InvalidHttpUriError;
+    type Error = InvalidUriError;
 
-    fn try_from(value: &'a str) -> Result<Self, InvalidHttpUriError> {
-        let uri = http::uri::Uri::try_from(value).map_err(|_e| InvalidHttpUriError(()))?;
+    fn try_from(value: &'a str) -> Result<Self, InvalidUriError> {
+        let uri = http::uri::Uri::try_from(value)
+            .map_err(|e| InvalidUriError(InvalidUriKind::ParseUri { source: e }))?;
 
         uri.try_into()
     }
@@ -416,10 +524,11 @@ impl<'a> TryFrom<&'a str> for HttpBaseUri {
 
 #[cfg(feature = "alloc")]
 impl TryFrom<alloc::string::String> for HttpBaseUri {
-    type Error = InvalidHttpUriError;
+    type Error = InvalidUriError;
 
-    fn try_from(value: alloc::string::String) -> Result<Self, InvalidHttpUriError> {
-        let uri = http::uri::Uri::try_from(value).map_err(|_e| InvalidHttpUriError(()))?;
+    fn try_from(value: alloc::string::String) -> Result<Self, InvalidUriError> {
+        let uri = http::uri::Uri::try_from(value)
+            .map_err(|e| InvalidUriError(InvalidUriKind::ParseUri { source: e }))?;
 
         uri.try_into()
     }
@@ -427,10 +536,11 @@ impl TryFrom<alloc::string::String> for HttpBaseUri {
 
 #[cfg(feature = "alloc")]
 impl TryFrom<alloc::vec::Vec<u8>> for HttpBaseUri {
-    type Error = InvalidHttpUriError;
+    type Error = InvalidUriError;
 
-    fn try_from(value: alloc::vec::Vec<u8>) -> Result<Self, InvalidHttpUriError> {
-        let uri = http::uri::Uri::try_from(value).map_err(|_e| InvalidHttpUriError(()))?;
+    fn try_from(value: alloc::vec::Vec<u8>) -> Result<Self, InvalidUriError> {
+        let uri = http::uri::Uri::try_from(value)
+            .map_err(|e| InvalidUriError(InvalidUriKind::ParseUri { source: e }))?;
 
         uri.try_into()
     }
@@ -445,7 +555,7 @@ mod tests {
         let invalid_scheme = http::uri::Scheme::from_str("ftp")?;
 
         let http_scheme = HttpScheme::try_from(invalid_scheme);
-        assert!(http_scheme.is_err());
+        assert_eq!(http_scheme.unwrap_err().to_string(), "invalid scheme: ftp");
 
         Ok(())
     }
@@ -480,7 +590,7 @@ mod tests {
         let invalid_pathandquery = http::uri::PathAndQuery::from_str("/resource?param=value")?;
 
         let path = Path::try_from(invalid_pathandquery);
-        assert!(path.is_err());
+        assert_eq!(path.unwrap_err().to_string(), "has query: param=value");
 
         Ok(())
     }
@@ -502,12 +612,12 @@ mod tests {
         let invalid_httpbaseuri = "/resource?param=value";
 
         let httpbaseuri = HttpBaseUri::try_from(invalid_httpbaseuri);
-        assert!(httpbaseuri.is_err());
+        assert_eq!(httpbaseuri.unwrap_err().to_string(), "missing scheme");
 
         let invalid_httpbaseuri = "api.example.com";
 
         let httpbaseuri = HttpBaseUri::try_from(invalid_httpbaseuri);
-        assert!(httpbaseuri.is_err());
+        assert_eq!(httpbaseuri.unwrap_err().to_string(), "missing scheme");
 
         Ok(())
     }
