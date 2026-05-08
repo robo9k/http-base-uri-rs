@@ -374,17 +374,28 @@ impl TryFrom<alloc::vec::Vec<u8>> for Path {
 pub trait PathExt {
     /// Returns whether the path is empty, i.e. just `/`
     fn is_empty(&self) -> bool;
+
+    /// Returns whether the path ends with a slash, i.e. `/` (or is empty)
+    fn ends_with_slash(&self) -> bool;
 }
 
 impl PathExt for http::uri::PathAndQuery {
     fn is_empty(&self) -> bool {
         self.as_str() == "/"
     }
+
+    fn ends_with_slash(&self) -> bool {
+        self.as_str().ends_with('/')
+    }
 }
 
 impl PathExt for Path {
     fn is_empty(&self) -> bool {
         self.as_str() == "/"
+    }
+
+    fn ends_with_slash(&self) -> bool {
+        self.as_str().ends_with('/')
     }
 }
 
@@ -823,7 +834,7 @@ mod tests {
     }
 
     #[test]
-    fn pathext() -> Result<(), Box<dyn std::error::Error>> {
+    fn pathext_is_empty() -> Result<(), Box<dyn std::error::Error>> {
         let empty_path_and_query = http::uri::PathAndQuery::from_static("");
         assert!(empty_path_and_query.is_empty());
         let empty_path_and_query = http::uri::PathAndQuery::from_static("/");
@@ -841,6 +852,31 @@ mod tests {
 
         let nonempty_path = Path::from_str("/base")?;
         assert!(!nonempty_path.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn pathext_ends_with_slash() -> Result<(), Box<dyn std::error::Error>> {
+        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        assert!(empty_path_and_query.ends_with_slash());
+        let empty_path_and_query = http::uri::PathAndQuery::from_static("/");
+        assert!(empty_path_and_query.ends_with_slash());
+
+        let withoutslash_path_and_query = http::uri::PathAndQuery::from_static("/segment");
+        assert!(!withoutslash_path_and_query.ends_with_slash());
+        let withslash_path_and_query = http::uri::PathAndQuery::from_static("/segment/");
+        assert!(withslash_path_and_query.ends_with_slash());
+
+        let empty_path = Path::from_str("")?;
+        assert!(empty_path.ends_with_slash());
+        let empty_path = Path::from_str("/")?;
+        assert!(empty_path.ends_with_slash());
+
+        let withoutslash_path = Path::from_str("/segment")?;
+        assert!(!withoutslash_path.ends_with_slash());
+        let withslash_path = Path::from_str("/segment/")?;
+        assert!(withslash_path.ends_with_slash());
 
         Ok(())
     }
