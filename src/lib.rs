@@ -344,6 +344,24 @@ impl TryFrom<alloc::vec::Vec<u8>> for Path {
     }
 }
 
+/// Extension for [`Path`] and [`http::uri::PathAndQuery`]
+pub trait PathExt {
+    /// Returns whether the path is empty, i.e. just `/`
+    fn is_empty(&self) -> bool;
+}
+
+impl PathExt for http::uri::PathAndQuery {
+    fn is_empty(&self) -> bool {
+        self.as_str() == "/"
+    }
+}
+
+impl PathExt for Path {
+    fn is_empty(&self) -> bool {
+        self.as_str() == "/"
+    }
+}
+
 /// [`http::uri::Parts`] for [`Uri`]
 #[derive(Debug)]
 #[non_exhaustive]
@@ -746,6 +764,29 @@ mod tests {
         let uri = Uri::try_from("https://api.example.com/rest/v2#frag1")?;
 
         assert_eq!(format!("{uri}"), "https://api.example.com/rest/v2");
+
+        Ok(())
+    }
+
+    #[test]
+    fn pathext() -> Result<(), Box<dyn std::error::Error>> {
+        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        assert!(empty_path_and_query.is_empty());
+        let empty_path_and_query = http::uri::PathAndQuery::from_static("/");
+        assert!(empty_path_and_query.is_empty());
+
+        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment");
+        assert!(!nonempty_path_and_query.is_empty());
+        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        assert!(!nonempty_path_and_query.is_empty());
+
+        let empty_path = Path::from_str("")?;
+        assert!(empty_path.is_empty());
+        let empty_path = Path::from_str("/")?;
+        assert!(empty_path.is_empty());
+
+        let nonempty_path = Path::from_str("/segment")?;
+        assert!(!nonempty_path.is_empty());
 
         Ok(())
     }
