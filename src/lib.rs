@@ -35,6 +35,11 @@
 //!     // typesafe, correct by construction 😌
 //!     base_uri: http_base_uri::Uri,
 //! }
+//!
+//! // join path and optional query onto base
+//! let base_uri = "https://api.example.com/rest/v2".parse::<http_base_uri::Uri>()?;
+//! let endpoint_pathandquery = "/endpoint?param=value".parse::<http::uri::PathAndQuery>()?;
+//! assert_eq!(base_uri.join(endpoint_pathandquery), "https://api.example.com/rest/v2/endpoint?param=value");
 //! # Ok(())
 //! # }
 //! ```
@@ -186,6 +191,27 @@ pub struct Path(http::uri::PathAndQuery);
 impl Path {
     pub fn as_str(&self) -> &str {
         self.0.as_str()
+    }
+
+    /// Joins a path (and query) onto this path
+    #[cfg(feature = "alloc")]
+    pub fn join(self, path_and_query: http::uri::PathAndQuery) -> http::uri::PathAndQuery {
+        if self.is_empty() {
+            path_and_query
+        } else if path_and_query.is_empty() {
+            self.into()
+        } else {
+            let self_str = self.as_str();
+            let path_and_query_str = path_and_query.as_str();
+            let combined_len = self_str.len() + path_and_query_str.len();
+
+            let mut buf = alloc::string::String::with_capacity(combined_len);
+            buf.push_str(self_str);
+            buf.push_str(path_and_query_str);
+
+            buf.try_into()
+                .expect("valid Path and valid PathAndQuery combined is valid PathAndQuery")
+        }
     }
 }
 
@@ -470,6 +496,16 @@ impl TryFrom<http::uri::Uri> for Parts {
     }
 }
 
+impl From<Uri> for Parts {
+    fn from(value: Uri) -> Self {
+        Self {
+            scheme: value.scheme,
+            authority: value.authority,
+            path: value.path,
+        }
+    }
+}
+
 impl From<Parts> for http::uri::Parts {
     fn from(value: Parts) -> http::uri::Parts {
         let mut parts = http::uri::Parts::default();
@@ -529,6 +565,24 @@ impl Uri {
             authority,
             path,
         }
+    }
+
+    /// Joins a path (and query) onto this URI
+    #[cfg(feature = "alloc")]
+    pub fn join(self, path_and_query: http::uri::PathAndQuery) -> http::uri::Uri {
+        let Parts {
+            scheme,
+            authority,
+            path,
+        } = self.into();
+
+        let mut parts = http::uri::Parts::default();
+        parts.scheme = Some(scheme.into());
+        parts.authority = Some(authority);
+        parts.path_and_query = Some(path.join(path_and_query));
+
+        http::uri::Uri::from_parts(parts)
+            .expect("valid scheme, authority and joined paths are valid http::uri::Uri")
     }
 }
 
@@ -785,8 +839,81 @@ mod tests {
         let empty_path = Path::from_str("/")?;
         assert!(empty_path.is_empty());
 
-        let nonempty_path = Path::from_str("/segment")?;
+        let nonempty_path = Path::from_str("/base")?;
         assert!(!nonempty_path.is_empty());
+
+        Ok(())
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn path_join() -> Result<(), Box<dyn std::error::Error>> {
+        let empty_path = Path::from_str("")?;
+        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        assert_eq!(empty_path.join(empty_path_and_query), "/");
+
+        let nonempty_path = Path::from_str("/base")?;
+        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        assert_eq!(nonempty_path.join(empty_path_and_query), "/base");
+
+        let empty_path = Path::from_str("")?;
+        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        assert_eq!(
+            empty_path.join(nonempty_path_and_query),
+            "/segment?param=value"
+        );
+
+        let nonempty_path = Path::from_str("/base")?;
+        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        assert_eq!(
+            nonempty_path.join(nonempty_path_and_query),
+            "/base/segment?param=value"
+        );
+
+        let nonempty_path = Path::from_str("/base/")?;
+        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        assert_eq!(
+            nonempty_path.join(nonempty_path_and_query),
+            "/base//segment?param=value"
+        );
+
+        Ok(())
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn uri_join() -> Result<(), Box<dyn std::error::Error>> {
+        let uri = Uri::from_str("https://api.example.com")?;
+        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        assert_eq!(uri.join(empty_path_and_query), "https://api.example.com");
+
+        let uri = Uri::from_str("https://api.example.com/base")?;
+        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        assert_eq!(
+            uri.join(empty_path_and_query),
+            "https://api.example.com/base"
+        );
+
+        let uri = Uri::from_str("https://api.example.com")?;
+        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        assert_eq!(
+            uri.join(nonempty_path_and_query),
+            "https://api.example.com/segment?param=value"
+        );
+
+        let uri = Uri::from_str("https://api.example.com/base")?;
+        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        assert_eq!(
+            uri.join(nonempty_path_and_query),
+            "https://api.example.com/base/segment?param=value"
+        );
+
+        let uri = Uri::from_str("https://api.example.com/base/")?;
+        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        assert_eq!(
+            uri.join(nonempty_path_and_query),
+            "https://api.example.com/base//segment?param=value"
+        );
 
         Ok(())
     }
