@@ -37,7 +37,7 @@
 //! }
 //!
 //! // join path and optional query onto base
-//! let base_uri = "https://api.example.com/rest/v2".parse::<http_base_uri::Uri>()?;
+//! let base_uri = "https://api.example.com/rest/v2/".parse::<http_base_uri::Uri>()?;
 //! let endpoint_pathandquery = "/endpoint?param=value".parse::<http::uri::PathAndQuery>()?;
 //! assert_eq!(base_uri.join(endpoint_pathandquery), "https://api.example.com/rest/v2/endpoint?param=value");
 //! # Ok(())
@@ -181,7 +181,6 @@ impl<'a> TryFrom<&'a str> for Scheme {
     }
 }
 
-// TODO: join PathAndQuery ?
 // TODO: pub const fn from_static(src: &'static str)
 // TODO: pub fn from_maybe_shared<T>(src: T)
 /// [`http::uri::PathAndQuery`] newtype without query
@@ -193,7 +192,8 @@ impl Path {
         self.0.as_str()
     }
 
-    /// Joins a path (and query) onto this path
+    /// Joins a path (and query) onto this path (treating the other as relative)
+    // FIXME: should this be the other way around, i.e. path_and_query.resolve(path) ?
     #[cfg(feature = "alloc")]
     pub fn join(self, path_and_query: http::uri::PathAndQuery) -> http::uri::PathAndQuery {
         if self.is_empty() {
@@ -201,13 +201,18 @@ impl Path {
         } else if path_and_query.is_empty() {
             self.into()
         } else {
-            let self_str = self.as_str();
-            let path_and_query_str = path_and_query.as_str();
-            let combined_len = self_str.len() + path_and_query_str.len();
+            // https://datatracker.ietf.org/doc/html/rfc3986#section-5.2.3
+            let base = match self.as_str().rsplit_once('/') {
+                None => "",
+                Some((path, "")) => path,
+                Some((path, _last_segment)) => path,
+            };
+            let reference = path_and_query.as_str();
+            let combined_len = base.len() + reference.len();
 
             let mut buf = alloc::string::String::with_capacity(combined_len);
-            buf.push_str(self_str);
-            buf.push_str(path_and_query_str);
+            buf.push_str(base);
+            buf.push_str(reference);
 
             buf.try_into()
                 .expect("valid Path and valid PathAndQuery combined is valid PathAndQuery")
@@ -578,7 +583,7 @@ impl Uri {
         }
     }
 
-    /// Joins a path (and query) onto this URI
+    /// Joins a path (and query) onto this URI (treating the path as relative)
     #[cfg(feature = "alloc")]
     pub fn join(self, path_and_query: http::uri::PathAndQuery) -> http::uri::Uri {
         let Parts {
@@ -903,14 +908,14 @@ mod tests {
         let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
         assert_eq!(
             nonempty_path.join(nonempty_path_and_query),
-            "/base/segment?param=value"
+            "/segment?param=value"
         );
 
         let nonempty_path = Path::from_str("/base/")?;
         let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
         assert_eq!(
             nonempty_path.join(nonempty_path_and_query),
-            "/base//segment?param=value"
+            "/base/segment?param=value"
         );
 
         Ok(())
@@ -941,14 +946,14 @@ mod tests {
         let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
         assert_eq!(
             uri.join(nonempty_path_and_query),
-            "https://api.example.com/base/segment?param=value"
+            "https://api.example.com/segment?param=value"
         );
 
         let uri = Uri::from_str("https://api.example.com/base/")?;
         let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
         assert_eq!(
             uri.join(nonempty_path_and_query),
-            "https://api.example.com/base//segment?param=value"
+            "https://api.example.com/base/segment?param=value"
         );
 
         Ok(())
