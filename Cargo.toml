@@ -29,6 +29,13 @@ std = [
     "http/std", # https://github.com/hyperium/http/issues/551
 ]
 alloc = []
+## Enable `schemars::JsonSchema` impl
+schemars = ["dep:schemars", "alloc"]
 
 [dependencies]
 http = { version = "1", default-features = false }
+schemars = { version = "1", optional = true, default-features = false }
+
+[dev-dependencies]
+serde_json = { version = "1", default-features = false }
+jsonschema = { version = "0.46", default-features = false }

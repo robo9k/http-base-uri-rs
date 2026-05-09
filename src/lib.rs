@@ -43,10 +43,16 @@
 //! # Ok(())
 //! # }
 //! ```
+//! # Features
+//!
+//! - `schemars` — Enable JSON schema for [`Uri`] using `schemars` v1
+//!
 // TODO: serde_core
 
 #![deny(unsafe_code)]
 #![cfg_attr(not(any(test)), no_std)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, doc(auto_cfg(hide(docsrs))))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -956,5 +962,68 @@ mod tests {
         );
 
         Ok(())
+    }
+}
+
+#[cfg(feature = "schemars")]
+mod schemars {
+    use crate::Uri;
+    use alloc::borrow::Cow;
+    use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
+
+    const EXAMPLES: &[&str] = &[
+        "https://api.example.com/rest/v2/",
+        "http://example.com",
+        "http://localhost:8080/api/",
+    ];
+
+    #[cfg_attr(docsrs, doc(cfg(feature = "schemars")))]
+    impl JsonSchema for Uri {
+        fn schema_name() -> Cow<'static, str> {
+            "Uri".into()
+        }
+
+        fn schema_id() -> Cow<'static, str> {
+            concat!(module_path!(), "::Uri").into()
+        }
+
+        fn json_schema(_: &mut SchemaGenerator) -> Schema {
+            json_schema!({
+                "title": "HTTP base URI",
+                "description": "HTTP/S URI with scheme, authority and path but no query",
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https?://[^?&#]+$",
+                "examples": EXAMPLES,
+            })
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use crate::{Uri, schemars::EXAMPLES};
+        use schemars::JsonSchema;
+
+        #[test]
+        fn impl_jsonschema() {
+            fn assert_jsonschema<T: JsonSchema>() {}
+            assert_jsonschema::<Uri>();
+        }
+
+        #[test]
+        fn example_value_schema() -> Result<(), Box<dyn std::error::Error>> {
+            let schema = ::schemars::schema_for!(Uri);
+            let validator = jsonschema::validator_for(schema.as_value())?;
+
+            for example in EXAMPLES {
+                let value = serde_json::to_value(*example)?;
+
+                if let Err(e) = validator.validate(&value) {
+                    panic!("JSON value does not validate for schema: {}", e);
+                }
+            }
+
+            Ok(())
+        }
     }
 }
