@@ -995,6 +995,12 @@ mod schemars {
                 "format": "uri",
                 "pattern": "^https?://[^?&#]+$",
                 "examples": EXAMPLES,
+                // https://github.com/oxidecomputer/typify#including-x-rust-type-in-your-library
+                "x-rust-type": {
+                    "crate": env!("CARGO_CRATE_NAME"),
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "path": concat!(env!("CARGO_CRATE_NAME"), "::Uri"),
+                },
             })
         }
     }
