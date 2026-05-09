@@ -3,11 +3,11 @@
 //! ```rust
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Look Ma'; scheme and authority and path, but no query!
-//! let base_uri = "https://api.example.com/rest/v2".parse::<http_base_uri::Uri>()?;
+//! let base_uri = "https://api.example.com/rest/v2/".parse::<http_base_uri::Uri>()?;
 //!
 //! assert_eq!(base_uri.scheme(), &http::uri::Scheme::HTTPS);
 //! assert_eq!(base_uri.authority(), "api.example.com");
-//! assert_eq!(base_uri.path(), "/rest/v2");
+//! assert_eq!(base_uri.path(), "/rest/v2/");
 //!
 //! // http_base_uri::Uri is a subset of http::Uri
 //! let uri: http::Uri = base_uri.into();
@@ -20,7 +20,7 @@
 //! assert_eq!(base_uri.path(), "/"); // this is a quirk of http::Uri
 //!
 //! // invalid; has query
-//! let not_a_base_uri = "https://api.example.com/rest/v2?param=value";
+//! let not_a_base_uri = "https://api.example.com/rest/v2/?param=value";
 //! assert!(not_a_base_uri.parse::<http_base_uri::Uri>().is_err());
 //!
 //! // invalid; missing scheme
@@ -830,9 +830,9 @@ mod tests {
 
     #[test]
     fn uri_display() -> Result<(), Box<dyn std::error::Error>> {
-        let uri = Uri::try_from("https://api.example.com/rest/v2#frag1")?;
+        let uri = Uri::try_from("https://api.example.com/rest/v2/#frag1")?;
 
-        assert_eq!(format!("{uri}"), "https://api.example.com/rest/v2");
+        assert_eq!(format!("{uri}"), "https://api.example.com/rest/v2/");
 
         Ok(())
     }
