@@ -45,9 +45,9 @@
 //! ```
 //! # Features
 //!
+//! - `serde` — Enable serializing and deserializing [`Uri`] using `serde` v1
 //! - `schemars` — Enable JSON schema for [`Uri`] using `schemars` v1
 //!
-// TODO: serde_core
 
 #![deny(unsafe_code)]
 #![cfg_attr(not(any(test)), no_std)]
@@ -1030,6 +1030,74 @@ mod schemars {
             }
 
             Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde {
+    use crate::Uri;
+    use serde_core::de::{Deserialize, Deserializer};
+    use serde_core::ser::{Serialize, Serializer};
+
+    #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+    impl Serialize for Uri {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            serializer.collect_str(self)
+        }
+    }
+
+    #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+    impl<'de> Deserialize<'de> for Uri {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            use serde_core::de::Error;
+            use serde_core::de::Visitor;
+
+            struct UriVisitor;
+
+            impl<'de> Visitor<'de> for UriVisitor {
+                type Value = Uri;
+
+                fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+                    formatter.write_str("a string that is a valid HTTP base URI")
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: Error,
+                {
+                    v.parse().map_err(Error::custom)
+                }
+            }
+
+            deserializer.deserialize_str(UriVisitor)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use serde_test2::{Token, assert_de_tokens_error, assert_tokens};
+        use std::str::FromStr;
+
+        #[test]
+        fn ser_de() -> Result<(), Box<dyn std::error::Error>> {
+            let uri = Uri::from_str("https://api.example.com/rest/v2/")?;
+
+            assert_tokens(&uri, &[Token::Str("https://api.example.com/rest/v2/")]);
+
+            Ok(())
+        }
+
+        #[test]
+        fn de_error() {
+            assert_de_tokens_error::<Uri>(&[Token::Str("hurz")], "invalid parts");
         }
     }
 }

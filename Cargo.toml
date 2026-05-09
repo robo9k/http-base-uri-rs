@@ -31,11 +31,15 @@ std = [
 alloc = []
 ## Enable `schemars::JsonSchema` impl
 schemars = ["dep:schemars", "alloc"]
+## Enable `serde::{Deserialize, Serialize}` impls
+serde = ["dep:serde_core"]
 
 [dependencies]
 http = { version = "1", default-features = false }
 schemars = { version = "1", optional = true, default-features = false }
+serde_core = { version = "1", optional = true, default-features = false }
 
 [dev-dependencies]
 serde_json = { version = "1", default-features = false }
 jsonschema = { version = "0.46", default-features = false }
+serde_test2 = { version = "2", default-features = false, features = ["std"] }
