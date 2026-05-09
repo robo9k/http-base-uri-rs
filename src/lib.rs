@@ -53,13 +53,19 @@ extern crate alloc;
 
 use core::str::FromStr;
 
+use http::uri::Authority;
+use http::uri::Parts as HttpParts;
+use http::uri::PathAndQuery;
+use http::uri::Scheme as HttpScheme;
+use http::uri::Uri as HttpUri;
+
 /// [`http::uri::Scheme`] newtype that is either HTTP or HTTPS
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Scheme(http::uri::Scheme);
+pub struct Scheme(HttpScheme);
 
 impl Scheme {
-    pub const HTTP: Self = Self(http::uri::Scheme::HTTP);
-    pub const HTTPS: Self = Self(http::uri::Scheme::HTTPS);
+    pub const HTTP: Self = Self(HttpScheme::HTTP);
+    pub const HTTPS: Self = Self(HttpScheme::HTTPS);
 
     pub fn as_str(&self) -> &str {
         self.0.as_str()
@@ -72,8 +78,8 @@ impl core::fmt::Display for Scheme {
     }
 }
 
-impl AsRef<http::uri::Scheme> for Scheme {
-    fn as_ref(&self) -> &http::uri::Scheme {
+impl AsRef<HttpScheme> for Scheme {
+    fn as_ref(&self) -> &HttpScheme {
         &self.0
     }
 }
@@ -84,14 +90,14 @@ impl AsRef<str> for Scheme {
     }
 }
 
-impl From<Scheme> for http::uri::Scheme {
-    fn from(value: Scheme) -> Self {
+impl From<Scheme> for HttpScheme {
+    fn from(value: Scheme) -> HttpScheme {
         value.0
     }
 }
 
-impl PartialEq<http::uri::Scheme> for Scheme {
-    fn eq(&self, other: &http::uri::Scheme) -> bool {
+impl PartialEq<HttpScheme> for Scheme {
+    fn eq(&self, other: &HttpScheme) -> bool {
         self.0 == *other
     }
 }
@@ -109,7 +115,7 @@ pub struct InvalidSchemeError(InvalidSchemeKind);
 #[derive(Debug)]
 enum InvalidSchemeKind {
     ParseScheme { source: http::uri::InvalidUri },
-    NotHttp { scheme: http::uri::Scheme },
+    NotHttp { scheme: HttpScheme },
 }
 
 impl core::fmt::Display for InvalidSchemeError {
@@ -134,11 +140,11 @@ impl core::error::Error for InvalidSchemeError {
     }
 }
 
-impl TryFrom<http::uri::Scheme> for Scheme {
+impl TryFrom<HttpScheme> for Scheme {
     type Error = InvalidSchemeError;
 
-    fn try_from(value: http::uri::Scheme) -> Result<Self, Self::Error> {
-        if value == http::uri::Scheme::HTTP || value == http::uri::Scheme::HTTPS {
+    fn try_from(value: HttpScheme) -> Result<Self, Self::Error> {
+        if value == HttpScheme::HTTP || value == HttpScheme::HTTPS {
             Ok(Self(value))
         } else {
             Err(InvalidSchemeError(InvalidSchemeKind::NotHttp {
@@ -152,7 +158,7 @@ impl FromStr for Scheme {
     type Err = InvalidSchemeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let scheme = http::uri::Scheme::from_str(s)
+        let scheme = HttpScheme::from_str(s)
             .map_err(|e| InvalidSchemeError(InvalidSchemeKind::ParseScheme { source: e }))?;
 
         scheme.try_into()
@@ -163,7 +169,7 @@ impl<'a> TryFrom<&'a [u8]> for Scheme {
     type Error = InvalidSchemeError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        let scheme = http::uri::Scheme::try_from(value)
+        let scheme = HttpScheme::try_from(value)
             .map_err(|e| InvalidSchemeError(InvalidSchemeKind::ParseScheme { source: e }))?;
 
         scheme.try_into()
@@ -174,7 +180,7 @@ impl<'a> TryFrom<&'a str> for Scheme {
     type Error = InvalidSchemeError;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        let scheme = http::uri::Scheme::try_from(value)
+        let scheme = HttpScheme::try_from(value)
             .map_err(|e| InvalidSchemeError(InvalidSchemeKind::ParseScheme { source: e }))?;
 
         scheme.try_into()
@@ -185,7 +191,7 @@ impl<'a> TryFrom<&'a str> for Scheme {
 // TODO: pub fn from_maybe_shared<T>(src: T)
 /// [`http::uri::PathAndQuery`] newtype without query
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd)]
-pub struct Path(http::uri::PathAndQuery);
+pub struct Path(PathAndQuery);
 
 impl Path {
     pub fn as_str(&self) -> &str {
@@ -195,7 +201,7 @@ impl Path {
     /// Joins a path (and query) onto this path (treating the other as relative)
     // FIXME: should this be the other way around, i.e. path_and_query.resolve(path) ?
     #[cfg(feature = "alloc")]
-    pub fn join(self, path_and_query: http::uri::PathAndQuery) -> http::uri::PathAndQuery {
+    pub fn join(self, path_and_query: PathAndQuery) -> PathAndQuery {
         if self.is_empty() {
             path_and_query
         } else if path_and_query.is_empty() {
@@ -226,14 +232,14 @@ impl core::fmt::Display for Path {
     }
 }
 
-impl AsRef<http::uri::PathAndQuery> for Path {
-    fn as_ref(&self) -> &http::uri::PathAndQuery {
+impl AsRef<PathAndQuery> for Path {
+    fn as_ref(&self) -> &PathAndQuery {
         &self.0
     }
 }
 
-impl From<Path> for http::uri::PathAndQuery {
-    fn from(value: Path) -> Self {
+impl From<Path> for PathAndQuery {
+    fn from(value: Path) -> PathAndQuery {
         value.0
     }
 }
@@ -244,8 +250,8 @@ impl PartialEq<str> for Path {
     }
 }
 
-impl PartialEq<http::uri::PathAndQuery> for Path {
-    fn eq(&self, other: &http::uri::PathAndQuery) -> bool {
+impl PartialEq<PathAndQuery> for Path {
+    fn eq(&self, other: &PathAndQuery) -> bool {
         self.0 == *other
     }
 }
@@ -256,8 +262,8 @@ impl PartialOrd<str> for Path {
     }
 }
 
-impl PartialOrd<http::uri::PathAndQuery> for Path {
-    fn partial_cmp(&self, other: &http::uri::PathAndQuery) -> Option<core::cmp::Ordering> {
+impl PartialOrd<PathAndQuery> for Path {
+    fn partial_cmp(&self, other: &PathAndQuery) -> Option<core::cmp::Ordering> {
         self.0.partial_cmp(other)
     }
 }
@@ -268,12 +274,8 @@ pub struct InvalidPathError(InvalidPathKind);
 
 #[derive(Debug)]
 enum InvalidPathKind {
-    ParsePathAndQuery {
-        source: http::uri::InvalidUri,
-    },
-    HasQuery {
-        path_and_query: http::uri::PathAndQuery,
-    },
+    ParsePathAndQuery { source: http::uri::InvalidUri },
+    HasQuery { path_and_query: PathAndQuery },
 }
 
 impl core::fmt::Display for InvalidPathError {
@@ -304,10 +306,10 @@ impl core::error::Error for InvalidPathError {
     }
 }
 
-impl TryFrom<http::uri::PathAndQuery> for Path {
+impl TryFrom<PathAndQuery> for Path {
     type Error = InvalidPathError;
 
-    fn try_from(value: http::uri::PathAndQuery) -> Result<Self, Self::Error> {
+    fn try_from(value: PathAndQuery) -> Result<Self, Self::Error> {
         if value.query().is_none() {
             Ok(Self(value))
         } else {
@@ -322,7 +324,7 @@ impl FromStr for Path {
     type Err = InvalidPathError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let path = http::uri::PathAndQuery::from_str(s)
+        let path = PathAndQuery::from_str(s)
             .map_err(|e| InvalidPathError(InvalidPathKind::ParsePathAndQuery { source: e }))?;
 
         path.try_into()
@@ -333,7 +335,7 @@ impl<'a> TryFrom<&'a [u8]> for Path {
     type Error = InvalidPathError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        let path = http::uri::PathAndQuery::try_from(value)
+        let path = PathAndQuery::try_from(value)
             .map_err(|e| InvalidPathError(InvalidPathKind::ParsePathAndQuery { source: e }))?;
 
         path.try_into()
@@ -344,7 +346,7 @@ impl<'a> TryFrom<&'a str> for Path {
     type Error = InvalidPathError;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        let path = http::uri::PathAndQuery::try_from(value)
+        let path = PathAndQuery::try_from(value)
             .map_err(|e| InvalidPathError(InvalidPathKind::ParsePathAndQuery { source: e }))?;
 
         path.try_into()
@@ -356,7 +358,7 @@ impl TryFrom<alloc::string::String> for Path {
     type Error = InvalidPathError;
 
     fn try_from(value: alloc::string::String) -> Result<Self, Self::Error> {
-        let path = http::uri::PathAndQuery::try_from(value)
+        let path = PathAndQuery::try_from(value)
             .map_err(|e| InvalidPathError(InvalidPathKind::ParsePathAndQuery { source: e }))?;
 
         path.try_into()
@@ -368,7 +370,7 @@ impl TryFrom<alloc::vec::Vec<u8>> for Path {
     type Error = InvalidPathError;
 
     fn try_from(value: alloc::vec::Vec<u8>) -> Result<Self, Self::Error> {
-        let path = http::uri::PathAndQuery::try_from(value)
+        let path = PathAndQuery::try_from(value)
             .map_err(|e| InvalidPathError(InvalidPathKind::ParsePathAndQuery { source: e }))?;
 
         path.try_into()
@@ -384,7 +386,7 @@ pub trait PathExt {
     fn ends_with_slash(&self) -> bool;
 }
 
-impl PathExt for http::uri::PathAndQuery {
+impl PathExt for PathAndQuery {
     fn is_empty(&self) -> bool {
         self.as_str() == "/"
     }
@@ -410,13 +412,13 @@ impl PathExt for Path {
 pub struct Parts {
     pub scheme: Scheme,
 
-    pub authority: http::uri::Authority,
+    pub authority: Authority,
 
     pub path: Path,
 }
 
 impl Parts {
-    pub const fn new(scheme: Scheme, authority: http::uri::Authority, path: Path) -> Self {
+    pub const fn new(scheme: Scheme, authority: Authority, path: Path) -> Self {
         Self {
             authority,
             scheme,
@@ -472,10 +474,10 @@ impl core::error::Error for InvalidPartsError {
     }
 }
 
-impl TryFrom<http::uri::Parts> for Parts {
+impl TryFrom<HttpParts> for Parts {
     type Error = InvalidPartsError;
 
-    fn try_from(value: http::uri::Parts) -> Result<Self, Self::Error> {
+    fn try_from(value: HttpParts) -> Result<Self, Self::Error> {
         let scheme: Scheme = if let Some(scheme) = value.scheme {
             scheme
                 .try_into()
@@ -504,10 +506,10 @@ impl TryFrom<http::uri::Parts> for Parts {
     }
 }
 
-impl TryFrom<http::uri::Uri> for Parts {
+impl TryFrom<HttpUri> for Parts {
     type Error = InvalidPartsError;
 
-    fn try_from(value: http::uri::Uri) -> Result<Self, Self::Error> {
+    fn try_from(value: HttpUri) -> Result<Self, Self::Error> {
         Self::try_from(value.into_parts())
     }
 }
@@ -522,9 +524,9 @@ impl From<Uri> for Parts {
     }
 }
 
-impl From<Parts> for http::uri::Parts {
-    fn from(value: Parts) -> http::uri::Parts {
-        let mut parts = http::uri::Parts::default();
+impl From<Parts> for HttpParts {
+    fn from(value: Parts) -> HttpParts {
+        let mut parts = HttpParts::default();
 
         parts.scheme = Some(value.scheme.into());
         parts.authority = Some(value.authority);
@@ -534,11 +536,11 @@ impl From<Parts> for http::uri::Parts {
     }
 }
 
-impl From<Parts> for http::uri::Uri {
-    fn from(value: Parts) -> http::uri::Uri {
-        let parts: http::uri::Parts = value.into();
+impl From<Parts> for HttpUri {
+    fn from(value: Parts) -> HttpUri {
+        let parts: HttpParts = value.into();
 
-        http::uri::Uri::try_from(parts).expect("Parts are valid http::uri::Uri")
+        HttpUri::try_from(parts).expect("Parts are valid http::uri::Uri")
     }
 }
 
@@ -552,7 +554,7 @@ impl From<Parts> for http::uri::Uri {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Uri {
     scheme: Scheme,
-    authority: http::uri::Authority,
+    authority: Authority,
     path: Path,
 }
 
@@ -561,7 +563,7 @@ impl Uri {
         &self.scheme
     }
 
-    pub const fn authority(&self) -> &http::uri::Authority {
+    pub const fn authority(&self) -> &Authority {
         &self.authority
     }
 
@@ -585,19 +587,19 @@ impl Uri {
 
     /// Joins a path (and query) onto this URI (treating the path as relative)
     #[cfg(feature = "alloc")]
-    pub fn join(self, path_and_query: http::uri::PathAndQuery) -> http::uri::Uri {
+    pub fn join(self, path_and_query: PathAndQuery) -> HttpUri {
         let Parts {
             scheme,
             authority,
             path,
         } = self.into();
 
-        let mut parts = http::uri::Parts::default();
+        let mut parts = HttpParts::default();
         parts.scheme = Some(scheme.into());
         parts.authority = Some(authority);
         parts.path_and_query = Some(path.join(path_and_query));
 
-        http::uri::Uri::from_parts(parts)
+        HttpUri::from_parts(parts)
             .expect("valid scheme, authority and joined paths are valid http::uri::Uri")
     }
 }
@@ -614,9 +616,9 @@ impl core::fmt::Display for Uri {
     }
 }
 
-impl From<Uri> for http::uri::Parts {
-    fn from(value: Uri) -> http::uri::Parts {
-        let mut parts = http::uri::Parts::default();
+impl From<Uri> for HttpParts {
+    fn from(value: Uri) -> HttpParts {
+        let mut parts = HttpParts::default();
         parts.scheme = Some(value.scheme.0);
         parts.authority = Some(value.authority);
         parts.path_and_query = Some(value.path.0);
@@ -625,11 +627,11 @@ impl From<Uri> for http::uri::Parts {
     }
 }
 
-impl From<Uri> for http::uri::Uri {
-    fn from(value: Uri) -> http::uri::Uri {
-        let parts: http::uri::Parts = value.into();
+impl From<Uri> for HttpUri {
+    fn from(value: Uri) -> HttpUri {
+        let parts: HttpParts = value.into();
 
-        http::uri::Uri::try_from(parts).expect("Parts are valid http::uri::Uri")
+        HttpUri::try_from(parts).expect("Parts are valid http::uri::Uri")
     }
 }
 
@@ -665,10 +667,10 @@ impl core::error::Error for InvalidUriError {
     }
 }
 
-impl TryFrom<http::uri::Parts> for Uri {
+impl TryFrom<HttpParts> for Uri {
     type Error = InvalidPartsError;
 
-    fn try_from(value: http::uri::Parts) -> Result<Self, Self::Error> {
+    fn try_from(value: HttpParts) -> Result<Self, Self::Error> {
         let parts: Parts = value.try_into()?;
 
         Ok(Self::from(parts))
@@ -681,10 +683,10 @@ impl From<Parts> for Uri {
     }
 }
 
-impl TryFrom<http::uri::Uri> for Uri {
+impl TryFrom<HttpUri> for Uri {
     type Error = InvalidPartsError;
 
-    fn try_from(value: http::uri::Uri) -> Result<Self, Self::Error> {
+    fn try_from(value: HttpUri) -> Result<Self, Self::Error> {
         let parts: Parts = value.try_into()?;
 
         Ok(Self::from(parts))
@@ -695,7 +697,7 @@ impl FromStr for Uri {
     type Err = InvalidUriError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let uri = http::uri::Uri::from_str(s)
+        let uri = HttpUri::from_str(s)
             .map_err(|e| InvalidUriError(InvalidUriKind::ParseUri { source: e }))?;
 
         uri.try_into()
@@ -707,7 +709,7 @@ impl<'a> TryFrom<&'a [u8]> for Uri {
     type Error = InvalidUriError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, InvalidUriError> {
-        let uri = http::uri::Uri::try_from(value)
+        let uri = HttpUri::try_from(value)
             .map_err(|e| InvalidUriError(InvalidUriKind::ParseUri { source: e }))?;
 
         uri.try_into()
@@ -719,7 +721,7 @@ impl<'a> TryFrom<&'a str> for Uri {
     type Error = InvalidUriError;
 
     fn try_from(value: &'a str) -> Result<Self, InvalidUriError> {
-        let uri = http::uri::Uri::try_from(value)
+        let uri = HttpUri::try_from(value)
             .map_err(|e| InvalidUriError(InvalidUriKind::ParseUri { source: e }))?;
 
         uri.try_into()
@@ -732,7 +734,7 @@ impl TryFrom<alloc::string::String> for Uri {
     type Error = InvalidUriError;
 
     fn try_from(value: alloc::string::String) -> Result<Self, InvalidUriError> {
-        let uri = http::uri::Uri::try_from(value)
+        let uri = HttpUri::try_from(value)
             .map_err(|e| InvalidUriError(InvalidUriKind::ParseUri { source: e }))?;
 
         uri.try_into()
@@ -745,7 +747,7 @@ impl TryFrom<alloc::vec::Vec<u8>> for Uri {
     type Error = InvalidUriError;
 
     fn try_from(value: alloc::vec::Vec<u8>) -> Result<Self, InvalidUriError> {
-        let uri = http::uri::Uri::try_from(value)
+        let uri = HttpUri::try_from(value)
             .map_err(|e| InvalidUriError(InvalidUriKind::ParseUri { source: e }))?;
 
         uri.try_into()
@@ -759,7 +761,7 @@ mod tests {
 
     #[test]
     fn scheme_tryfrom() -> Result<(), Box<dyn std::error::Error>> {
-        let invalid_scheme = http::uri::Scheme::from_str("ftp")?;
+        let invalid_scheme = HttpScheme::from_str("ftp")?;
 
         let scheme = Scheme::try_from(invalid_scheme);
         assert_eq!(scheme.unwrap_err().to_string(), "scheme not http/s: ftp");
@@ -770,8 +772,8 @@ mod tests {
     #[test]
     fn scheme_into() -> Result<(), Box<dyn std::error::Error>> {
         let scheme = Scheme::HTTPS;
-        let scheme: http::uri::Scheme = scheme.into();
-        assert_eq!(scheme, http::uri::Scheme::HTTPS);
+        let scheme: HttpScheme = scheme.into();
+        assert_eq!(scheme, HttpScheme::HTTPS);
 
         Ok(())
     }
@@ -794,7 +796,7 @@ mod tests {
 
     #[test]
     fn path_tryfrom() -> Result<(), Box<dyn std::error::Error>> {
-        let invalid_pathandquery = http::uri::PathAndQuery::from_str("/resource?param=value")?;
+        let invalid_pathandquery = PathAndQuery::from_str("/resource?param=value")?;
 
         let path = Path::try_from(invalid_pathandquery);
         assert_eq!(path.unwrap_err().to_string(), "has query: param=value");
@@ -805,11 +807,8 @@ mod tests {
     #[test]
     fn path_into() -> Result<(), Box<dyn std::error::Error>> {
         let path = Path::from_str("/resource")?;
-        let pathandquery: http::uri::PathAndQuery = path.into();
-        assert_eq!(
-            pathandquery,
-            http::uri::PathAndQuery::from_str("/resource")?
-        );
+        let pathandquery: PathAndQuery = path.into();
+        assert_eq!(pathandquery, PathAndQuery::from_str("/resource")?);
 
         Ok(())
     }
@@ -840,14 +839,14 @@ mod tests {
 
     #[test]
     fn pathext_is_empty() -> Result<(), Box<dyn std::error::Error>> {
-        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        let empty_path_and_query = PathAndQuery::from_static("");
         assert!(empty_path_and_query.is_empty());
-        let empty_path_and_query = http::uri::PathAndQuery::from_static("/");
+        let empty_path_and_query = PathAndQuery::from_static("/");
         assert!(empty_path_and_query.is_empty());
 
-        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment");
+        let nonempty_path_and_query = PathAndQuery::from_static("/segment");
         assert!(!nonempty_path_and_query.is_empty());
-        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        let nonempty_path_and_query = PathAndQuery::from_static("/segment?param=value");
         assert!(!nonempty_path_and_query.is_empty());
 
         let empty_path = Path::from_str("")?;
@@ -863,14 +862,14 @@ mod tests {
 
     #[test]
     fn pathext_ends_with_slash() -> Result<(), Box<dyn std::error::Error>> {
-        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        let empty_path_and_query = PathAndQuery::from_static("");
         assert!(empty_path_and_query.ends_with_slash());
-        let empty_path_and_query = http::uri::PathAndQuery::from_static("/");
+        let empty_path_and_query = PathAndQuery::from_static("/");
         assert!(empty_path_and_query.ends_with_slash());
 
-        let withoutslash_path_and_query = http::uri::PathAndQuery::from_static("/segment");
+        let withoutslash_path_and_query = PathAndQuery::from_static("/segment");
         assert!(!withoutslash_path_and_query.ends_with_slash());
-        let withslash_path_and_query = http::uri::PathAndQuery::from_static("/segment/");
+        let withslash_path_and_query = PathAndQuery::from_static("/segment/");
         assert!(withslash_path_and_query.ends_with_slash());
 
         let empty_path = Path::from_str("")?;
@@ -890,29 +889,29 @@ mod tests {
     #[test]
     fn path_join() -> Result<(), Box<dyn std::error::Error>> {
         let empty_path = Path::from_str("")?;
-        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        let empty_path_and_query = PathAndQuery::from_static("");
         assert_eq!(empty_path.join(empty_path_and_query), "/");
 
         let nonempty_path = Path::from_str("/base")?;
-        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        let empty_path_and_query = PathAndQuery::from_static("");
         assert_eq!(nonempty_path.join(empty_path_and_query), "/base");
 
         let empty_path = Path::from_str("")?;
-        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        let nonempty_path_and_query = PathAndQuery::from_static("/segment?param=value");
         assert_eq!(
             empty_path.join(nonempty_path_and_query),
             "/segment?param=value"
         );
 
         let nonempty_path = Path::from_str("/base")?;
-        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        let nonempty_path_and_query = PathAndQuery::from_static("/segment?param=value");
         assert_eq!(
             nonempty_path.join(nonempty_path_and_query),
             "/segment?param=value"
         );
 
         let nonempty_path = Path::from_str("/base/")?;
-        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        let nonempty_path_and_query = PathAndQuery::from_static("/segment?param=value");
         assert_eq!(
             nonempty_path.join(nonempty_path_and_query),
             "/base/segment?param=value"
@@ -925,32 +924,32 @@ mod tests {
     #[test]
     fn uri_join() -> Result<(), Box<dyn std::error::Error>> {
         let uri = Uri::from_str("https://api.example.com")?;
-        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        let empty_path_and_query = PathAndQuery::from_static("");
         assert_eq!(uri.join(empty_path_and_query), "https://api.example.com");
 
         let uri = Uri::from_str("https://api.example.com/base")?;
-        let empty_path_and_query = http::uri::PathAndQuery::from_static("");
+        let empty_path_and_query = PathAndQuery::from_static("");
         assert_eq!(
             uri.join(empty_path_and_query),
             "https://api.example.com/base"
         );
 
         let uri = Uri::from_str("https://api.example.com")?;
-        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        let nonempty_path_and_query = PathAndQuery::from_static("/segment?param=value");
         assert_eq!(
             uri.join(nonempty_path_and_query),
             "https://api.example.com/segment?param=value"
         );
 
         let uri = Uri::from_str("https://api.example.com/base")?;
-        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        let nonempty_path_and_query = PathAndQuery::from_static("/segment?param=value");
         assert_eq!(
             uri.join(nonempty_path_and_query),
             "https://api.example.com/segment?param=value"
         );
 
         let uri = Uri::from_str("https://api.example.com/base/")?;
-        let nonempty_path_and_query = http::uri::PathAndQuery::from_static("/segment?param=value");
+        let nonempty_path_and_query = PathAndQuery::from_static("/segment?param=value");
         assert_eq!(
             uri.join(nonempty_path_and_query),
             "https://api.example.com/base/segment?param=value"
